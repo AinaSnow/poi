@@ -1,3 +1,4 @@
+import type { APIListClass } from 'kcsapi/api_get_member/questlist/response'
 import type { Dispatch } from 'redux'
 
 import * as remote from '@electron/remote'
@@ -10,6 +11,8 @@ import Scheduler from 'views/services/scheduler'
 import FileWriter from 'views/utils/file-writer'
 import { copyIfSame, arraySum } from 'views/utils/tools'
 
+import type { QuestOptions, QuestEvent } from '../actions'
+
 import {
   createAPIPortPortResponseAction,
   createAPIGetMemberRequireInfoAction,
@@ -17,69 +20,101 @@ import {
   createAPIReqQuestClearitemgetResponseAction,
   createInfoQuestsApplyProgressAction,
   createInfoQuestsDailyRefreshAction,
-  type QuestOptions,
 } from '../actions'
 
 // Workaround for https://github.com/electron/electron/issues/37404
 const CSON = remote.require('cson')
 
 // Type declarations
+// quest_goal.cson type declaration
+
+// 1=daily, 2=weekly, 3=monthly, 4=quarterly, 8/9=special daily
+// 101-112 = yearly by month (101=Jan, 102=Feb, ...)
+type QuestType =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 8
+  | 9
+  | 101
+  | 102
+  | 103
+  | 104
+  | 105
+  | 106
+  | 107
+  | 108
+  | 109
+  | 110
+  | 111
+  | 112
+
+// [shipNames[], minCount, exclusive?]
+type EscortShipConstraint = [string[], number, boolean?]
+
+// [shipTypeIds[], minCount, exclusive?]
+type EscortShipTypeConstraint = [number[], number, boolean?]
+
+// [shipClassIds[], minCount, exclusive?]
+type EscortShipClassConstraint = [number[], number, boolean?]
+
+export type GoalKey = QuestEvent | `${QuestEvent}@${string}`
+
+export interface QuestGoalSubgoal {
+  description?: string
+  required: number
+  init?: number
+  // Map constraints
+  maparea?: number[]
+  mapcell?: number[]
+  // Flagship constraints
+  flagship?: string[]
+  flagshiptype?: number[]
+  flagshipclass?: number[]
+  // Escort ship constraints
+  secondship?: string[]
+  escortship?: EscortShipConstraint[]
+  escortshiptype?: EscortShipTypeConstraint[]
+  escortshipclass?: EscortShipClassConstraint[]
+  banshiptype?: number[]
+  fleetlimit?: number
+  // Enemy ship filter
+  shipType?: number[]
+  // Expedition filter
+  mission?: string[]
+  // Equipment filter
+  slotitemType2?: number[]
+  // Internal tracking hint (used to disambiguate overlapping quests)
+  times?: number[]
+}
+
+type RequestGoalKey = keyof QuestGoalSubgoal & keyof QuestOptions
+
+export type QuestGoal = {
+  type?: QuestType
+  fuzzy?: boolean
+  resetInterval?: number
+} & Partial<Record<GoalKey, QuestGoalSubgoal>>
+
+// quest_tracking.cson type declaration
 export interface SubgoalRecord {
   count: number
   required: number
   description?: string
 }
 
-export interface QuestRecord {
+export type QuestRecord = {
   id: number | string
   count?: number
   required?: number
   active?: boolean
   time?: number
-  [key: string]: SubgoalRecord | number | string | boolean | undefined
-}
-
-export interface QuestDetail {
-  api_no: number
-  api_type?: number
-  api_state?: number
-  api_progress_flag?: number
-  api_label_type?: number
-  [key: string]: unknown
-}
+} & Partial<Record<GoalKey, SubgoalRecord>>
 
 export interface ActiveQuest {
-  detail: QuestDetail
+  detail: APIListClass
   time: number
-}
-
-export interface QuestGoalSubgoal {
-  init?: number
-  required?: number
-  description?: string
-  shipType?: number[]
-  mission?: string[]
-  maparea?: number[]
-  slotitemType2?: number[]
-  times?: number[]
-  mapcell?: number[]
-  flagship?: string[]
-  secondship?: string[]
-  escortship?: [string[], number, boolean][]
-  flagshiptype?: number[]
-  escortshiptype?: [number[], number, boolean][]
-  flagshipclass?: number[]
-  escortshipclass?: [number[], number, boolean][]
-  fleetlimit?: number
-  banshiptype?: number[]
-  [key: string]: unknown
-}
-
-export interface QuestGoal {
-  type?: number
-  fuzzy?: boolean
-  resetInterval?: number
-  [key: string]: QuestGoalSubgoal | number | boolean | undefined
 }
 
 export interface QuestsState {
@@ -113,16 +148,16 @@ export const ARMENIA_TIMEZONE = 'Asia/Yerevan'
 
 // Remove items from an object where its value doesn't satisfy `pred`.
 // The argument `obj` IS MODIFIED.
-function filterObjectValue<T extends Record<string, unknown>>(
-  obj: T,
-  pred: (v: unknown) => boolean = Boolean,
-): T {
+function filterObjectValue<T>(
+  obj: Record<string | number, T>,
+): Record<string | number, NonNullable<T>> {
   forEach(obj, (v, k) => {
-    if (!pred(v)) {
+    if (!v) {
       delete obj[k]
     }
   })
-  return obj
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return obj as Record<string | number, NonNullable<T>>
 }
 
 function isDifferentDay(time1: number, time2: number): boolean {
@@ -183,10 +218,11 @@ function newQuestRecord(
     if (typeof v !== 'object') {
       return
     }
-    record[k] = {
-      count: (v as QuestGoalSubgoal).init || 0,
-      required: (v as QuestGoalSubgoal).required || 0,
-      description: (v as QuestGoalSubgoal).description,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    record[k as GoalKey] = {
+      count: v.init || 0,
+      required: v.required || 0,
+      description: v.description,
     }
   })
   return record
@@ -228,55 +264,34 @@ const resetQuestRecordYearlyFactory = (resetMonth: number) =>
   resetQuestRecordFactory([100 + resetMonth], 5)
 function outdateRecords(
   questGoals: Record<string | number, QuestGoal>,
-  records: Record<string | number, QuestRecord>,
+  records: Record<string | number, QuestRecord | undefined>,
   then: number,
   now: number,
 ): Record<string | number, QuestRecord> {
   if (!isDifferentDay(now, then)) {
-    return records
+    return filterObjectValue(records)
   }
-  records =
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- mapValues preserves Record type
-    mapValues(records, resetQuestRecordDaily(questGoals)) as Record<string | number, QuestRecord>
+  records = mapValues(records, resetQuestRecordDaily(questGoals))
   if (isDifferentWeek(now, then)) {
-    records =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- mapValues preserves Record type
-      mapValues(records, resetQuestRecordWeekly(questGoals)) as Record<string | number, QuestRecord>
+    records = mapValues(records, resetQuestRecordWeekly(questGoals))
   }
   if (isDifferentMonth(now, then)) {
-    records =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- mapValues preserves Record type
-      mapValues(records, resetQuestRecordMonthly(questGoals)) as Record<
-        string | number,
-        QuestRecord
-      >
+    records = mapValues(records, resetQuestRecordMonthly(questGoals))
   }
   if (isDifferentQuarter(now, then)) {
-    records =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- mapValues preserves Record type
-      mapValues(records, resetQuestRecordQuarterly(questGoals)) as Record<
-        string | number,
-        QuestRecord
-      >
+    records = mapValues(records, resetQuestRecordQuarterly(questGoals))
   }
   for (const resetMonth of range(1, 13)) {
     if (isDifferentYear(now, then, resetMonth)) {
-      records =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- mapValues preserves Record type
-        mapValues(records, resetQuestRecordYearlyFactory(resetMonth)(questGoals)) as Record<
-          string | number,
-          QuestRecord
-        >
+      records = mapValues(records, resetQuestRecordYearlyFactory(resetMonth)(questGoals))
     }
   }
-  return filterObjectValue(records) as Record<string | number, QuestRecord>
+  return filterObjectValue(records)
 }
 
 function filterActiveQuestFactory(now: number) {
   return (activeQuest: Partial<ActiveQuest> = {}): boolean => {
-    const { time, detail: { api_type, api_no, api_label_type } = {} } =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Required for destructuring from Partial type
-      activeQuest as ActiveQuest
+    const { time, detail: { api_type, api_no, api_label_type } = {} } = activeQuest
     if (!time || !api_type) return false
     if (!isDifferentDay(now, time)) return true
     // Daily
@@ -304,52 +319,45 @@ function outdateActiveQuests(
   now: number,
 ): Record<number, ActiveQuest> {
   const activeQuestList = values(activeQuests).filter(filterActiveQuestFactory(now))
-  if (activeQuestList.length === Object.keys(activeQuests).length)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Type narrowing when no change
-    return activeQuests as Record<number, ActiveQuest>
+  if (activeQuestList.length === Object.keys(activeQuests).length) return activeQuests
   return formActiveQuests(activeQuestList)
 }
 
-function satisfyGoal(req: string, goal: QuestGoalSubgoal, options: QuestOptions | null): boolean {
-  const goalReq =
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Goal value can be an array
-    goal[req] as unknown[] | undefined
-  const unsatisfy =
-    goalReq &&
-    (!options ||
-      !goalReq.includes(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Index access on QuestOptions
-        (options as Record<string, unknown>)[req],
-      ))
+function satisfyGoal(
+  req: RequestGoalKey,
+  goal: QuestGoalSubgoal,
+  options: QuestOptions | null,
+): boolean {
+  const goalReq = goal[req]
+  const optionVal = options?.[req]
+  // @ts-expect-error FIXME: wating ts magic
+  const unsatisfy = goalReq && (!optionVal || !goalReq.includes(optionVal))
   return !unsatisfy
 }
 
-function satisfyShip(
-  goal: QuestGoalSubgoal,
-  options: QuestOptions & { shipname: string[]; shiptype: number[]; shipclass: number[] },
-): boolean {
+function satisfyShip(goal: QuestGoalSubgoal, options: QuestOptions): boolean {
   if (
     goal.flagship &&
-    (options.shipname.length < 1 ||
-      !goal.flagship.some((goalName) => options.shipname[0].includes(goalName)))
+    ((options?.shipname?.length ?? 0) < 1 ||
+      !goal.flagship.some((goalName) => options?.shipname?.[0]?.includes(goalName)))
   ) {
     return false
   }
   if (
     goal.secondship &&
-    (options.shipname.length < 2 ||
-      !goal.secondship.some((goalName) => options.shipname[1].includes(goalName)))
+    ((options?.shipname?.length ?? 0) < 2 ||
+      !goal.secondship.some((goalName) => options?.shipname?.[1]?.includes(goalName)))
   ) {
     return false
   }
   if (goal.escortship && goal.escortship.length) {
     let flag = false
     for (const [goalNames, goalCount, ignoreFlagShip] of goal.escortship) {
-      const shipname = ignoreFlagShip ? options.shipname.slice(1) : options.shipname
-      const count = shipname.filter((optionShipName) =>
+      const shipname = ignoreFlagShip ? options?.shipname?.slice(1) : options?.shipname
+      const count = shipname?.filter((optionShipName) =>
         goalNames.some((goalName) => optionShipName.includes(goalName)),
       ).length
-      if (count >= goalCount) {
+      if ((count ?? 0) >= goalCount) {
         flag = true
       }
     }
@@ -357,38 +365,38 @@ function satisfyShip(
       return false
     }
   }
-  if (goal.flagshiptype && !goal.flagshiptype.includes(options.shiptype[0])) {
+  if (goal.flagshiptype && !goal.flagshiptype.includes(options?.shiptype?.[0] ?? -1)) {
     return false
   }
   if (goal.escortshiptype && goal.escortshiptype.length > 0) {
     for (const [goalType, goalCount, ignoreFlagShip] of goal.escortshiptype) {
-      const shiptype = ignoreFlagShip ? options.shiptype.slice(1) : options.shiptype
-      const count = shiptype.filter((optionShipType) => goalType.includes(optionShipType)).length
-      if (count < goalCount) {
+      const shiptype = ignoreFlagShip ? options.shiptype?.slice(1) : options.shiptype
+      const count = shiptype?.filter((optionShipType) => goalType.includes(optionShipType)).length
+      if ((count ?? 0) < goalCount) {
         return false
       }
     }
   }
 
-  if (goal.flagshipclass && !goal.flagshipclass.includes(options.shipclass[0])) {
+  if (goal.flagshipclass && !goal.flagshipclass.includes(options.shipclass?.[0] ?? -1)) {
     return false
   }
   if (goal.escortshipclass && goal.escortshipclass.length > 0) {
     for (const [goalClass, goalCount, ignoreFlagShip] of goal.escortshipclass) {
-      const shipclass = ignoreFlagShip ? options.shipclass.slice(1) : options.shipclass
-      const count = shipclass.filter((optionShipClass) =>
+      const shipclass = ignoreFlagShip ? options.shipclass?.slice(1) : options.shipclass
+      const count = shipclass?.filter((optionShipClass) =>
         goalClass.includes(optionShipClass),
       ).length
-      if (count < goalCount) {
+      if ((count ?? 0) < goalCount) {
         return false
       }
     }
   }
-  if (goal.fleetlimit && options.shipname.length > goal.fleetlimit) {
+  if (goal.fleetlimit && (options?.shipname?.length ?? 0) > goal.fleetlimit) {
     return false
   }
   if (goal.banshiptype && goal.banshiptype.length > 0) {
-    if (goal.banshiptype.some((goalType) => options.shiptype.includes(goalType))) {
+    if (goal.banshiptype.some((goalType) => options?.shiptype?.includes(goalType))) {
       return false
     }
   }
@@ -401,27 +409,26 @@ function updateQuestRecordFactory(
   activeQuests: Record<string | number, ActiveQuest>,
   questGoals: Record<string | number, QuestGoal>,
 ) {
-  return (event: string, options: QuestOptions | null, delta: number): boolean => {
+  return (event: QuestEvent, options: QuestOptions | null, delta: number): boolean => {
     let changed = false
     forEach(activeQuests, (activeQuest) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Default empty object for destructuring
-      const quest = (activeQuest || ({} as ActiveQuest)).detail
+      const quest = activeQuest?.detail
       if (typeof quest !== 'object') return
       const { api_no } = quest
       const record = records[api_no]
       const goal = questGoals[api_no] || {}
-      let match: string[] = []
+      let match: GoalKey[] = []
       if (!api_no || !record) {
         return
       }
       if (goal.fuzzy) {
         // 'fuzzy' will also appears in Object.keys(goal)
         // use @ as separator because we could have battle_boss_win and battle_boss_win_s
-        match = Object.keys(goal).filter((x) => x.startsWith(`${event}@`))
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        match = Object.keys(goal).filter((x) => x.startsWith(`${event}@`)) as GoalKey[]
       }
       forEach([...match, event], (_event) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const subgoal = goal[_event] as QuestGoalSubgoal | undefined
+        const subgoal = goal[_event]
         if (!subgoal) {
           return
         }
@@ -441,7 +448,7 @@ function updateQuestRecordFactory(
         if (!existing || typeof existing !== 'object') {
           return
         }
-        const existingSubrecord = existing as Partial<SubgoalRecord>
+        const existingSubrecord = existing
         if (
           typeof existingSubrecord.count !== 'number' ||
           typeof existingSubrecord.required !== 'number' ||
@@ -490,7 +497,7 @@ function limitProgress(
 
 // Update progress of existing records
 // Returns a new copy of record if it needs updating, or undefined o/w
-function updateRecordProgress(record: QuestRecord, bodyQuest: QuestDetail): QuestRecord {
+function updateRecordProgress(record: QuestRecord, bodyQuest: APIListClass): QuestRecord {
   const { api_progress_flag, api_state } = bodyQuest
   let subgoalKey: string | null = null
   forEach(record, (v, k) => {
@@ -598,18 +605,14 @@ const questsSlice = createSlice({
       .addCase(createAPIGetMemberQuestlistResponseAction, (state, action) => {
         const body = action.payload.body
         const activeNum = Number(body.api_exec_count) || 0
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- State type narrowing
-        let activeQuests = state.activeQuests as Record<string | number, ActiveQuest>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- State type narrowing
-        let records = state.records as Record<string | number, QuestRecord>
+        let activeQuests = state.activeQuests
+        let records = state.records
         const questGoals = state.questGoals
         const now = Date.now()
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- API response type definition
-        ;((body as { api_list?: unknown[] }).api_list || []).forEach((quest) => {
+        ;(body.api_list || []).forEach((quest) => {
           if (!quest || typeof quest !== 'object') return
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Type narrowing after check
-          const q = quest as QuestDetail
+          const q = quest
           const api_state = Number(q.api_state)
           const api_no = q.api_no
           if (api_no == null) return
@@ -727,10 +730,7 @@ const fileWriter = new FileWriter()
 // Subscriber, used after the store is created
 // Need to observe on state quests.records
 export function saveQuestTracking(records: Record<string | number, QuestRecord>): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- window.getStore is an untyped global store accessor, so we assert the expected slice shape here
-  const { activeQuests } = window.getStore('info.quests') as {
-    activeQuests: Record<string | number, ActiveQuest>
-  }
+  const { activeQuests } = window.getStore('info.quests')
   const admiralId = String(window.getStore('info.basic.api_member_id') ?? '')
   fileWriter.write(
     questTrackingPath(admiralId),

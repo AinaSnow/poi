@@ -1,3 +1,5 @@
+import type { Layouts } from 'react-grid-layout'
+
 import type { PluginID } from './utils'
 
 interface LimitFps {
@@ -8,6 +10,7 @@ interface LimitFps {
 interface Screenshot {
   format: string
   usecanvas: boolean
+  path?: string
 }
 
 interface Cache {
@@ -31,6 +34,7 @@ interface PoiMisc {
   screenshot: Screenshot
   cache: Cache
   trustedCerts: string[]
+  untrustedCerts?: string[]
   pinminimap: boolean
   language?: string
 }
@@ -52,6 +56,7 @@ interface PoiAppearance {
   vibrant: number
   customtitlebar: boolean
   background?: string
+  enableOverviewFleetDetail?: boolean
 }
 
 interface PoiWindow {
@@ -161,25 +166,8 @@ interface PoiUnusedEquipmentSlotCheck {
   ignoreUnlocked: boolean
 }
 
-interface LayoutItem {
-  w: number
-  h: number
-  x: number
-  y: number
-  minW: number
-  minH: number
-  maxW: number
-  maxH: number
-  i: string
-}
-
-interface MainPanelLayout {
-  sm: LayoutItem[]
-  lg: LayoutItem[]
-}
-
 interface PoiMainPanel {
-  layout: MainPanelLayout
+  layout: Layouts
 }
 
 interface PluginBooleanMap {
