@@ -1,14 +1,23 @@
+import type { APISlotItem } from 'kcsapi/api_get_member/require_info/response'
+import type { APIShip } from 'kcsapi/api_port/port/response'
 import type { ConstState } from 'views/redux/const'
-import type { InfoState } from 'views/redux/info'
+import type { Fleet } from 'views/redux/info/fleets'
 import type { SortieState } from 'views/redux/sortie'
 
 import { flatMap, map, get } from 'lodash'
+import { getStore } from 'views/create-store'
 import { config } from 'views/env-parts/config'
+
+interface DamagedCheckInfo {
+  fleets: Fleet[]
+  ships: Record<number, APIShip>
+  equips: Record<number, APISlotItem>
+}
 
 export const damagedCheck = (
   { $ships, $equips }: ConstState,
-  { sortieStatus, escapedPos }: SortieState,
-  { fleets, ships, equips }: InfoState,
+  { sortieStatus, escapedPos }: Pick<SortieState, 'sortieStatus' | 'escapedPos'>,
+  { fleets, ships, equips }: DamagedCheckInfo,
 ) => {
   const damagedShips: string[] = []
   const sortieShips = flatMap(sortieStatus, (sortie, index) =>
@@ -51,15 +60,15 @@ export const damagedCheck = (
 }
 
 export const gameRefreshPage = () => {
-  window.getStore('layout.webview.ref')?.getWebContents().reload()
+  getStore('layout.webview.ref')?.getWebContents().reload()
 }
 
 export const gameRefreshPageIgnoringCache = () => {
-  window.getStore('layout.webview.ref')?.reloadIgnoringCache()
+  getStore('layout.webview.ref')?.reloadIgnoringCache()
 }
 
 export const gameReload = () => {
-  window.getStore('layout.webview.ref')?.executeJavaScript(`
+  getStore('layout.webview.ref')?.executeJavaScript(`
   var doc;
   if (document.getElementById('game_frame')) {
     doc = document.getElementById('game_frame').contentDocument;

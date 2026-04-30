@@ -1,4 +1,5 @@
 import type { RootState } from 'views/redux/reducer-factory'
+import type { CountdownNotifyOptions } from 'views/utils/notifiers'
 
 import { Position, Tooltip } from '@blueprintjs/core'
 import { join as joinString, memoize } from 'lodash'
@@ -14,6 +15,7 @@ import {
   InfoTooltipItem,
 } from 'views/components/etc/styled-components'
 import { CountdownTimer } from 'views/components/main/parts/countdown-timer'
+import { getStore } from 'views/create-store'
 import i18next from 'views/env-parts/i18next'
 import { recoveryEndTime } from 'views/redux/timers/cond'
 import { getFleetSpeed, getSaku33, getSpeedLabel, getTyku } from 'views/utils/game-utils'
@@ -34,7 +36,7 @@ import {
 } from 'views/utils/selectors'
 
 const isActive = () =>
-  ['ship-view', 'main-view'].includes(String(window.getStore('ui.activeMainTab') ?? ''))
+  ['ship-view', 'main-view'].includes(String(getStore('ui.activeMainTab') ?? ''))
 
 const FleetStats = styled.div`
   white-space: nowrap;
@@ -95,10 +97,11 @@ interface CountdownLabelProps {
   fleetName: string
 }
 
-const basicNotifyConfig = {
+const basicNotifyConfig: CountdownNotifyOptions<string> = {
   type: 'morale',
   title: i18next.t('main:Morale'),
-  message: (names: string) => `${names} ${i18next.t('main:have recovered from fatigue')}`,
+  message: (names: string | string[]) =>
+    `${names} ${i18next.t('main:have recovered from fatigue')}`,
   icon: path.join(ROOT, 'assets', 'img', 'operation', 'sortie.png'),
 }
 

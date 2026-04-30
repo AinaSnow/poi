@@ -1,24 +1,27 @@
+import type { APISlotItem } from 'kcsapi/api_get_member/require_info/response'
+import type { APIShip } from 'kcsapi/api_port/port/response'
+import type { RootState } from 'views/redux/reducer-factory'
+
 import * as remote from '@electron/remote'
 import { map, get, mapValues } from 'lodash'
-/* global config, getStore */
 import { observer, observe } from 'redux-observers'
 import { createSelector } from 'reselect'
-import { store } from 'views/create-store'
+import { store, getStore } from 'views/create-store'
+import { config } from 'views/env-parts/config'
 import { buildArray } from 'views/utils/tools'
 
 const ipc = remote.require('./lib/ipc')
 
-function object2Array(obj) {
-  return buildArray(map(obj, (v, k) => [k, v]))
+function object2Array(obj: Record<string, unknown>) {
+  return buildArray(map(obj, (v, k) => [Number(k), v]))
 }
-function object2ArraySelectorFactory(path) {
-  const pathSelector = (state) => get(state, path)
+function object2ArraySelectorFactory(path: string) {
+  const pathSelector = (state: unknown) => get(state, path)
   return createSelector(pathSelector, (obj) => object2Array(obj))
 }
 
 // User config
-const language = Object.clone(window.language)
-delete window.language
+const language = window.language
 Object.defineProperty(window, 'language', {
   get: () => {
     return config.get('poi.misc.language', language)
@@ -69,118 +72,118 @@ Object.defineProperty(window.notify, 'expedition', {
 // Game data
 Object.defineProperty(window, '$slotitems', {
   get: () => {
-    return window.getStore('const.$equips') || {}
+    return getStore('const.$equips') || {}
   },
 })
 Object.defineProperty(window, '$slotitemTypes', {
   get: () => {
-    return window.getStore('const.$equipTypes') || {}
+    return getStore('const.$equipTypes') || {}
   },
 })
 const mapareasObject2ArraySelector = object2ArraySelectorFactory('const.$mapareas')
 Object.defineProperty(window, '$mapareas', {
   get: () => {
-    return mapareasObject2ArraySelector(window.getStore())
+    return mapareasObject2ArraySelector(getStore())
   },
 })
 Object.defineProperty(window, '$maps', {
   get: () => {
-    return window.getStore('const.$maps') || {}
+    return getStore('const.$maps') || {}
   },
 })
 const missionsObject2ArraySelector = object2ArraySelectorFactory('const.$missions')
 Object.defineProperty(window, '$missions', {
   get: () => {
-    return missionsObject2ArraySelector(window.getStore())
+    return missionsObject2ArraySelector(getStore())
   },
 })
 Object.defineProperty(window, '$shipTypes', {
   get: () => {
-    return window.getStore('const.$shipTypes') || {}
+    return getStore('const.$shipTypes') || {}
   },
 })
 Object.defineProperty(window, '$ships', {
   get: () => {
-    return window.getStore('const.$ships') || {}
+    return getStore('const.$ships') || {}
   },
 })
 Object.defineProperty(window, '$useitems', {
   get: () => {
-    return window.getStore('const.$useitems') || {}
+    return getStore('const.$useitems') || {}
   },
 })
 Object.defineProperty(window, '_decks', {
   get: () => {
-    return window.getStore('info.fleets') || []
+    return getStore('info.fleets') || []
   },
 })
 Object.defineProperty(window, '_nickName', {
   get: () => {
-    return window.getStore('info.basic.api_nickname') || ''
+    return getStore('info.basic.api_nickname') || ''
   },
 })
 Object.defineProperty(window, '_nickNameId', {
   get: () => {
-    return window.getStore('info.basic.api_nickname_id') || -1
+    return getStore('info.basic.api_nickname_id') || -1
   },
 })
 Object.defineProperty(window, '_teitokuId', {
   get: () => {
-    return window.getStore('info.basic.api_member_id') || -1
+    return getStore('info.basic.api_member_id') || -1
   },
 })
 Object.defineProperty(window, '_teitokuExp', {
   get: () => {
-    return window.getStore('info.basic.api_experience') || 0
+    return getStore('info.basic.api_experience') || 0
   },
 })
 Object.defineProperty(window, '_teitokuLv', {
   get: () => {
-    return window.getStore('info.basic.api_level') || 0
+    return getStore('info.basic.api_level') || 0
   },
 })
 Object.defineProperty(window, '_ndocks', {
   get: () => {
-    const ret = []
-    for (let i = 0; i < 4; i++) {
-      ret.push(window.getStore(`info.repairs.${i}.api_ship_id`))
-    }
-    return ret
+    return getStore('info.repairs')?.map((repair) => repair.api_ship_id) || []
   },
 })
 Object.defineProperty(window, '_eventMapRanks', {
   get: () => {
-    return mapValues(window.getStore('info.maps'), (m) => get(m, 'api_eventmap.api_selected_rank'))
+    return mapValues(getStore('info.maps'), (m) => get(m, 'api_eventmap.api_selected_rank'))
   },
 })
 Object.defineProperty(window, '_serverIp', {
   get: () => {
-    return window.getStore('info.server.ip')
+    return getStore('info.server.ip')
   },
 })
 Object.defineProperty(window, '_serverId', {
   get: () => {
-    return window.getStore('info.server.id')
+    return getStore('info.server.id')
   },
 })
 Object.defineProperty(window, '_serverName', {
   get: () => {
-    return window.getStore('info.server.name')
+    return getStore('info.server.name')
   },
 })
-const initShips = (dispatch, current, previous) => {
+
+const initShips = () => {
   window._ships = new Proxy(
-    { ...window.getStore('info.ships') },
+    { ...getStore('info.ships') },
     {
-      get: (target, property, receiver) => {
-        const ship = target[property]
+      get: (target, property) => {
+        const ship = target[Number(property)]
         if (typeof ship === 'undefined') {
           return undefined
         }
-        return new Proxy(ship, {
-          get: (innerTarget, innerProperty, innerReceiver) => {
-            if (ship[innerProperty] != null) return ship[innerProperty]
-            return window.getStore(`const.$ships.${ship.api_ship_id}.${innerProperty}`)
+        const shipRecord = ship
+        return new Proxy(shipRecord, {
+          get: (_innerTarget, innerProperty) => {
+            // @ts-expect-error force type assertion
+            const key: keyof APIShip = innerProperty
+            if (key in shipRecord) return shipRecord[key]
+            return getStore(`const.$ships.${shipRecord.api_ship_id}.${String(innerProperty)}`)
           },
         })
       },
@@ -188,19 +191,22 @@ const initShips = (dispatch, current, previous) => {
   )
 }
 
-const initEquips = (dispatch, current, previous) => {
+const initEquips = () => {
   window._slotitems = new Proxy(
-    { ...window.getStore('info.equips') },
+    { ...getStore('info.equips') },
     {
-      get: (target, property, receiver) => {
-        const equip = target[property]
+      get: (target, property) => {
+        const equip = target[Number(property)]
         if (typeof equip === 'undefined') {
           return undefined
         }
-        return new Proxy(equip, {
-          get: (innerTarget, innerProperty, innerReceiver) => {
-            if (equip[innerProperty] != null) return equip[innerProperty]
-            return window.getStore(`const.$equips.${equip.api_slotitem_id}.${innerProperty}`)
+        const equipRecord = equip
+        return new Proxy(equipRecord, {
+          get: (_innerTarget, innerProperty) => {
+            // @ts-expect-error force type assertion
+            const key: keyof APISlotItem = innerProperty
+            if (key in equipRecord) return equipRecord[key]
+            return getStore(`const.$equips.${equipRecord.api_slotitem_id}.${String(innerProperty)}`)
           },
         })
       },
@@ -209,8 +215,9 @@ const initEquips = (dispatch, current, previous) => {
 }
 
 const initWebviewWidth = () => {
+  const w = getStore('layout.webview.width')
   ipc.register('WebView', {
-    width: Number.isNaN(getStore('layout.webview.width')) ? 1200 : getStore('layout.webview.width'),
+    width: typeof w === 'number' && !Number.isNaN(w) ? w : 1200,
   })
 }
 
@@ -218,10 +225,13 @@ initShips()
 initEquips()
 initWebviewWidth()
 
-const shipsObserver = observer((state) => state.info.ships, initShips)
+const shipsObserver = observer((state: RootState) => state.info?.ships, initShips)
 
-const slotitemsObserver = observer((state) => state.info.equips, initEquips)
+const slotitemsObserver = observer((state: RootState) => state.info?.equips, initEquips)
 
-const webviewSizeObserver = observer((state) => state.layout.webview.width, initWebviewWidth)
+const webviewSizeObserver = observer(
+  (state: RootState) => state.layout?.webview?.width,
+  initWebviewWidth,
+)
 
 observe(store, [shipsObserver, slotitemsObserver, webviewSizeObserver])
