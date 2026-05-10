@@ -1,4 +1,7 @@
 import type { BrowserWindowConstructorOptions } from 'electron'
+import type { BrowserWindow } from 'electron/main'
+import type * as Utils from 'lib/utils'
+import type { PoiWindowOptions, default as WindowManager } from 'lib/window'
 import type { FC } from 'react'
 
 import * as remote from '@electron/remote'
@@ -23,14 +26,15 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-remarkable'
 import semver from 'semver'
+import { pathToFileURL } from 'url'
 import { promisify } from 'util'
 import { extendReducer } from 'views/create-store'
-import { config } from 'views/env-parts/config'
+import { config, ROOT } from 'views/env'
 import i18next, { addGlobalI18n, addResourceBundleDebounce } from 'views/env-parts/i18next'
 import { readI18nResources, normalizeURL } from 'views/utils/tools'
 
-const windowManager = remote.require('./lib/window')
-const utils = remote.require('./lib/utils')
+const windowManager: typeof WindowManager = remote.require('./lib/window')
+const utils: typeof Utils = remote.require('./lib/utils')
 
 const NPM_EXEC_PATH = join(ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js')
 const MIRROR_JSON_PATH = join(ROOT, 'assets', 'data', 'mirror.json')
@@ -65,15 +69,6 @@ export interface NpmConfig {
   prefix: string
   enableBetaPluginCheck: boolean
   http_proxy?: string
-}
-
-export interface PluginWindow {
-  setMenu: (menu: unknown) => void
-  setAutoHideMenuBar: (v: boolean) => void
-  setMenuBarVisibility: (v: boolean) => void
-  loadURL: (url: string) => void
-  show: () => void
-  on: (event: string, callback: () => void) => void
 }
 
 export interface Plugin {
@@ -113,7 +108,7 @@ export interface Plugin {
   settingsClass?: React.ComponentType
   switchPluginPath?: string[]
   windowOptions?: BrowserWindowConstructorOptions
-  pluginWindow?: PluginWindow | null
+  pluginWindow?: BrowserWindow | null
   handleClick?: () => void
   pluginDidLoad?: () => void
   pluginWillUnload?: () => void
@@ -166,7 +161,7 @@ export const findInstalledTarball = async (
   const filename = basename(tarballPath)
   const pluginPaths = await globAsync(join(pluginRoot, 'poi-plugin-*'))
   const packageDatas: Array<Record<string, unknown>> = await Promise.all(
-    pluginPaths.map((p) => readJson(join(p, 'package.json'))),
+    pluginPaths.map((p: string) => readJson(join(p, 'package.json'))),
   )
   const nameMatchDatas = packageDatas.filter((packageData) => {
     const requested = packageData['_requested']
@@ -448,7 +443,25 @@ export async function enablePlugin(plugin: Plugin, reread = true): Promise<Plugi
   if (plugin.needRollback) return plugin
   let pluginMain: Partial<Plugin>
   try {
-    const imported: Partial<Plugin> = await import(plugin.pluginPath)
+    const resolved = require.resolve(plugin.pluginPath)
+    let imported: Partial<Plugin>
+    try {
+      if (
+        resolved.endsWith('.ts') ||
+        resolved.endsWith('.tsx') ||
+        resolved.endsWith('.jsx') ||
+        resolved.endsWith('.es')
+      ) {
+        // untranspiled files can't be required directly, use require()
+        imported = await Promise.resolve(require(resolved))
+      } else {
+        // for transpiled files, use dynamic import to get better performance
+        imported = await import(`${pathToFileURL(resolved).href}?t=${Date.now()}`)
+      }
+    } catch {
+      // fallback
+      imported = await Promise.resolve(require(resolved))
+    }
     const rereadData: Partial<Plugin> = reread
       ? await readPlugin(plugin.pluginPath, plugin.isExtra)
       : {}
@@ -498,10 +511,10 @@ const postEnableProcess = (plugin: Plugin): Plugin => {
   if (plugin.windowURL) {
     const vibrancy =
       ['darwin'].includes(process.platform) && config.get('poi.appearance.vibrant', 0) === 1
-        ? 'ultra-dark'
+        ? 'window'
         : undefined
 
-    const windowOptions = {
+    const windowOptions: PoiWindowOptions = {
       x: config.get('poi.window.x', 0),
       y: config.get('poi.window.y', 0),
       width: 800,
@@ -514,9 +527,7 @@ const postEnableProcess = (plugin: Plugin): Plugin => {
         nodeIntegrationInWorker: true,
         nodeIntegrationInSubFrames: true,
         sandbox: false,
-        enableRemoteModule: true,
         contextIsolation: false,
-        affinity: 'poi-plugin',
         webSecurity: false,
         ...(isRecord(plugin.windowOptions?.webPreferences)
           ? plugin.windowOptions?.webPreferences
@@ -530,7 +541,7 @@ const postEnableProcess = (plugin: Plugin): Plugin => {
     const windowURL = normalizeURL(plugin.windowURL)
     if (plugin.multiWindow) {
       plugin.handleClick = () => {
-        const win: PluginWindow = windowManager.createWindow(windowOptions)
+        const win = windowManager.createWindow(windowOptions)
         win.setMenu(require('views/components/etc/menu').appMenu)
         win.setAutoHideMenuBar(true)
         win.setMenuBarVisibility(false)

@@ -1,5 +1,6 @@
 import type { FileFilter } from 'electron'
-import type { ConfigPath } from 'views/env-parts/config'
+import type { ConfigPath } from 'views/env'
+import type { RootState } from 'views/redux/reducer-factory'
 
 import { Position, Button, Intent, Classes, OverflowList, Tooltip } from '@blueprintjs/core'
 import * as remote from '@electron/remote'
@@ -11,16 +12,16 @@ import FA from 'react-fontawesome'
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
 import { styled } from 'styled-components'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
 import { isSubdirectory } from 'views/utils/tools'
 
-const { dialog } = remote.require('electron')
+const { dialog } = remote
 
 const PickerBox = styled.div`
   display: flex;
   width: 100%;
 
-  .bp5-overflow-list {
+  .bp6-overflow-list {
     flex: 1;
   }
 
@@ -28,7 +29,7 @@ const PickerBox = styled.div`
     margin-left: 1em;
   }
 
-  .bp5-breadcrumb {
+  .bp6-breadcrumb {
     font-size: 12px;
   }
 `
@@ -66,7 +67,9 @@ export const FolderPickerConfig: React.FC<FolderPickerConfigProps> = ({
   const [locked, setLocked] = useState(false)
 
   const { t } = useTranslation('setting')
-  const value = useSelector((state: any) => get(state.config, configName, defaultValue))
+  const value: string | undefined = useSelector((state: RootState) =>
+    get(state.config, configName, defaultValue),
+  )
 
   const emitErrorMessage = useCallback(() => {
     window.toast(t('setting:DirectoryNotAvailable', { path: label }), {
@@ -88,11 +91,12 @@ export const FolderPickerConfig: React.FC<FolderPickerConfigProps> = ({
   )
 
   useEffect(() => {
-    if (exclude.length && exclude.some((parent) => isSubdirectory(parent, value))) {
+    if (exclude.length && value && exclude.some((parent) => isSubdirectory(parent, value))) {
       emitErrorMessage()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config.set(configName as ConfigPath, defaultValue as never)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run on mount
 
   const handleOnDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -119,7 +123,7 @@ export const FolderPickerConfig: React.FC<FolderPickerConfigProps> = ({
     let defaultPath: string | undefined
     try {
       if (isFolder) {
-        fs.ensureDirSync(value)
+        if (value) fs.ensureDirSync(value)
         defaultPath = value
       }
     } catch (_e) {

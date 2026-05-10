@@ -16,6 +16,7 @@ import {
 } from 'views/components/etc/styled-components'
 import { CountdownTimer } from 'views/components/main/parts/countdown-timer'
 import { getStore } from 'views/create-store'
+import { ROOT } from 'views/env'
 import i18next from 'views/env-parts/i18next'
 import { recoveryEndTime } from 'views/redux/timers/cond'
 import { getFleetSpeed, getSaku33, getSpeedLabel, getTyku } from 'views/utils/game-utils'
@@ -109,6 +110,7 @@ const CountdownLabel = memo(
   ({ fleetId, completeTime, shouldNotify, fleetName }: CountdownLabelProps) => {
     const notifier = useRef(new CountdownNotifier())
     const propsRef = useRef({ shouldNotify, completeTime, fleetName })
+    // eslint-disable-next-line react-hooks/refs
     propsRef.current = { shouldNotify, completeTime, fleetName }
 
     const tick = useCallback(() => {

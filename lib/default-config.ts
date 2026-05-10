@@ -1,4 +1,4 @@
-import type { Layouts } from 'react-grid-layout'
+import type { ResponsiveLayouts as Layouts } from 'react-grid-layout'
 
 import type { PluginID } from './utils'
 
@@ -178,10 +178,22 @@ interface PluginBooleanMap {
   [pluginId: PluginID]: boolean
 }
 
+interface PinConfig {
+  deltaX: number
+  deltaY: number
+  width: number
+  height: number
+}
+
+interface PluginPositionDeltaMap {
+  [pluginId: PluginID]: PinConfig
+}
+
 interface PoiPluginConfig {
   windowmode?: PluginBooleanMap
   background?: PluginBooleanMap
   favorite?: PluginBooleanMap
+  pin?: PluginPositionDeltaMap
 }
 
 interface PoiNetwork {

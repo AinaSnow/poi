@@ -1,4 +1,5 @@
-import type { APIListClass } from 'kcsapi/api_get_member/questlist/response'
+import type * as Cson from 'cson'
+import type { APIList } from 'kcsapi/api_get_member/questlist/response'
 import type { Dispatch } from 'redux'
 
 import * as remote from '@electron/remote'
@@ -22,7 +23,7 @@ import {
 } from '../actions'
 
 // Workaround for https://github.com/electron/electron/issues/37404
-const CSON = remote.require('cson')
+const CSON: typeof Cson = remote.require('cson')
 
 // Type declarations
 // quest_goal.cson type declaration
@@ -112,7 +113,7 @@ export type QuestRecord = {
 } & Partial<Record<GoalKey, SubgoalRecord>>
 
 export interface ActiveQuest {
-  detail: APIListClass
+  detail: APIList
   time: number
 }
 
@@ -496,7 +497,7 @@ function limitProgress(
 
 // Update progress of existing records
 // Returns a new copy of record if it needs updating, or undefined o/w
-function updateRecordProgress(record: QuestRecord, bodyQuest: APIListClass): QuestRecord {
+function updateRecordProgress(record: QuestRecord, bodyQuest: APIList): QuestRecord {
   const { api_progress_flag, api_state } = bodyQuest
   let subgoalKey: string | null = null
   forEach(record, (v, k) => {

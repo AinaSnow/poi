@@ -3,13 +3,14 @@
  */
 /* eslint-disable import-x/namespace */
 
+import { PortalContext } from '@blueprintjs/core'
 import { contains } from 'dom-helpers'
 import { includes, debounce } from 'lodash'
 import React, { cloneElement, useContext, useState, Component } from 'react'
 import * as ReactBootstrap from 'react-bootstrap'
 import ReactDOM from 'react-dom'
 
-import { WindowEnv } from '../components/etc/window-env'
+import { isMain } from '../env-parts/const'
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const rb = ReactBootstrap as unknown as Record<string, React.ComponentType<Record<string, unknown>>>
@@ -257,7 +258,8 @@ class OverlayTriggerInner extends Component<OverlayTriggerInnerProps, OverlayTri
     const triggerProps: Record<string, unknown> = {}
 
     if (this.state.show) {
-      triggerProps['aria-describedby'] = overlay.props.id
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      triggerProps['aria-describedby'] = (overlay.props as Record<string, unknown>)['id']
     }
 
     triggerProps.onClick = createChainedFunction(
@@ -327,13 +329,13 @@ export const OverlayTrigger = ({
   children,
   ...props
 }: OverlayTriggerInnerProps & { children: React.ReactElement }) => (
-  <OverlayTriggerInner container={useContext(WindowEnv).mountPoint} {...props}>
+  <OverlayTriggerInner container={useContext(PortalContext).portalContainer} {...props}>
     {children}
   </OverlayTriggerInner>
 )
 
 export const Modal = ({ children, ...props }: React.ComponentProps<typeof OriginModal>) => (
-  <OriginModal container={useContext(WindowEnv).mountPoint} {...props}>
+  <OriginModal container={useContext(PortalContext).portalContainer} {...props}>
     {children}
   </OriginModal>
 )
@@ -363,7 +365,7 @@ Modal.Dialog = OriginModal.Dialog
 Dropdown.Toggle = OriginDropdown.Toggle
 Dropdown.Menu = OriginDropdown.Menu
 
-if (window.isMain) {
+if (isMain) {
   /* eslint-disable no-import-assign */
   ;(ReactBootstrap as Record<string, unknown>).OverlayTrigger = OverlayTrigger
   ;(ReactBootstrap as Record<string, unknown>).Modal = Modal

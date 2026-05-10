@@ -1,15 +1,17 @@
-import { ResizeSensor, Popover } from '@blueprintjs/core'
+import type { ConfigInstance } from 'lib/config'
+
+import { ResizeSensor, Popover, BlueprintProvider, Button } from '@blueprintjs/core'
 import * as remote from '@electron/remote'
 import { webFrame } from 'electron'
-import { get } from 'lodash'
 import React, { useCallback } from 'react'
 import { createRoot } from 'react-dom/client'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import { useDispatch, useSelector, Provider } from 'react-redux'
-import { ThemeProvider } from 'styled-components'
 
 import '../assets/css/app.css'
 import '../assets/css/global.css'
+import { styled, ThemeProvider } from 'styled-components'
+
 import type { RootState } from './redux/reducer-factory'
 
 import BasicAuth from './components/etc/http-basic-auth'
@@ -21,16 +23,14 @@ import i18next from './env-parts/i18next'
 import { KanGameWindowWrapper } from './kan-game-window-wrapper'
 import { KanGameWrapper } from './kan-game-wrapper'
 import { PoiApp } from './poi-app'
+import { createLayoutUpdateAction } from './redux/actions/layout'
 import { darkTheme, lightTheme } from './theme'
 import { POPOVER_MODIFIERS } from './utils/tools'
 
-const config = remote.require('./lib/config')
+const config: ConfigInstance = remote.require('./lib/config')
 
 // Disable OSX zoom
 webFrame.setVisualZoomLevelLimits(1, 1)
-
-// Hackable panels
-window.hack = {}
 
 // Alert functions
 require('./services/alert')
@@ -39,16 +39,23 @@ require('./services/alert')
 // ATTENTION default props will be overridden by providing props
 Popover.defaultProps.modifiers = POPOVER_MODIFIERS
 
+const PinButton = styled(Button)`
+  align-self: center;
+  -webkit-app-region: no-drag;
+`
+
 const Poi = () => {
   const dispatch = useDispatch()
+  const { t } = useTranslation()
   const isHorizontal = useSelector(
-    (state: RootState) => get(state, 'config.poi.layout.mode', 'horizontal') === 'horizontal',
+    (state: RootState) => (state.config?.poi?.layout?.mode ?? 'horizontal') === 'horizontal',
   )
-  const reversed = useSelector((state: RootState) => get(state, 'config.poi.layout.reverse', false))
-  const isolateGameWindow = useSelector((state: RootState) =>
-    get(state, 'config.poi.layout.isolate', false),
+  const pinConfig = useSelector((state: RootState) => state.config?.poi?.plugin?.pin?.kangame)
+  const reversed = useSelector((state: RootState) => state.config?.poi?.layout?.reverse ?? false)
+  const isolateGameWindow = useSelector(
+    (state: RootState) => state.config?.poi?.layout?.isolate ?? false,
   )
-  const theme = useSelector((state: RootState) => get(state, 'config.poi.appearance.theme', 'dark'))
+  const theme = useSelector((state: RootState) => state.config?.poi?.appearance?.theme ?? 'dark')
 
   const handleResize = useCallback(
     (entries: ResizeObserverEntry[]) => {
@@ -59,19 +66,41 @@ const Poi = () => {
           height !== 0 &&
           (width !== getStore('layout.window.width') || height !== getStore('layout.window.height'))
         ) {
-          dispatch({
-            type: '@@LayoutUpdate',
-            value: {
-              window: {
-                width,
-                height,
-              },
-            },
-          })
+          dispatch(createLayoutUpdateAction({ window: { width, height } }))
         }
       })
     },
     [dispatch],
+  )
+
+  const handlePin = () => {
+    if (pinConfig) {
+      config.delete('poi.plugin.pin.kangame')
+    } else {
+      const mainWindow = remote.getCurrentWindow()
+      const bounds = mainWindow.getBounds()
+      const kangameWindow = remote.BrowserWindow.getAllWindows().find((win) =>
+        win.webContents.getURL().includes('kangame'),
+      )
+      const kangameBounds = kangameWindow?.getBounds()
+      config.set('poi.plugin.pin.kangame', {
+        deltaX: (kangameBounds?.x ?? bounds.x) - bounds.x,
+        deltaY: (kangameBounds?.y ?? bounds.y) - bounds.y,
+        width: kangameBounds?.width ?? bounds.width,
+        height: kangameBounds?.height ?? bounds.height,
+      })
+    }
+  }
+
+  const pinButton = (
+    <PinButton
+      icon={pinConfig ? 'pin' : 'unpin'}
+      active={!!pinConfig}
+      minimal
+      onClick={() => handlePin()}
+      title={pinConfig ? t('setting:Unpin') : t('setting:Pin')}
+      small
+    />
   )
 
   return (
@@ -92,7 +121,11 @@ const Poi = () => {
               ...(!isHorizontal && { overflow: 'hidden' }),
             }}
           >
-            {isolateGameWindow ? <KanGameWindowWrapper /> : <KanGameWrapper key="frame" />}
+            {isolateGameWindow ? (
+              <KanGameWindowWrapper titleExtra={pinButton} pinned={!!pinConfig} />
+            ) : (
+              <KanGameWrapper key="frame" />
+            )}
             <PoiApp />
           </poi-main>
         </ResizeSensor>
@@ -113,7 +146,9 @@ ReactRoot.render(
           mountPoint: document.body,
         }}
       >
-        <Poi />
+        <BlueprintProvider portalContainer={document.body}>
+          <Poi />
+        </BlueprintProvider>
       </WindowEnv.Provider>
     </Provider>
   </I18nextProvider>,

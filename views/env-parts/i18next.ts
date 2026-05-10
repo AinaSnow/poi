@@ -4,13 +4,13 @@ import { readJSONSync, writeFileSync } from 'fs-extra'
 import glob from 'glob'
 import { createInstance } from 'i18next'
 import { toString, each, debounce } from 'lodash'
-/* global ROOT */
 import path from 'path'
 import { initReactI18next } from 'react-i18next'
 import { format } from 'util'
 import { readI18nResources, escapeI18nKey, cjkSpacing } from 'views/utils/tools'
 
 import { config } from './config'
+import { isMain, ROOT } from './const'
 import { dbg } from './dbg'
 
 const LOCALES = [
@@ -59,12 +59,20 @@ each(
 
 declare global {
   interface Window {
+    /** @deprecated Use `config.get('poi.misc.language')` instead */
     language?: string
+    /** @deprecated Use `import { LOCALES } from 'views/env-parts/i18next'` instead */
     LOCALES: Array<{ locale: string; lng: string }>
+    /** @deprecated Use `import i18next from 'views/env-parts/i18next'` instead */
     i18next?: ReturnType<typeof createInstance>
+    /** @deprecated Use `import { addGlobalI18n } from 'views/env-parts/i18next'` instead */
     i18n: Record<
       string,
-      { __: TFunction; translate: (locale: string, str: string) => string; fixedT: TFunction }
+      {
+        __: (key: string, ...args: unknown[]) => string
+        translate: (locale: string, str: string) => string
+        fixedT: TFunction
+      }
     >
   }
 }
@@ -88,9 +96,11 @@ const normalizeLanguage = (language: string) => {
 
 declare global {
   interface Window {
+    /** @deprecated Use `config.get('poi.misc.language')` instead */
     language?: string
   }
   // eslint-disable-next-line no-var
+  /** @deprecated Use `config.get('poi.misc.language')` instead */
   var language: string
 }
 
@@ -145,8 +155,8 @@ if (dbg?.isEnabled()) {
 
 export interface FallbackInstance {
   fixedT: TFunction
-  __: TFunction
-  __n: TFunction
+  __: (key: string, ...args: unknown[]) => string
+  __n: (key: string, ...args: unknown[]) => string
   setLocale: (locale: string) => void
 }
 
@@ -158,9 +168,9 @@ const i18nHack = (window.i18n = {} as Record<string, FallbackInstance>)
 // export addGlobalI18n for plugin manager usage
 export const addGlobalI18n = (namespace: string) => {
   const fixedT = i18next.getFixedT(language, namespace)
-  const __: TFunction = (str, ...args) =>
+  const __: (key: string, ...args: unknown[]) => string = (str, ...args) =>
     format(i18nHack[namespace].fixedT(escapeI18nKey(str)), ...args)
-  const __n: TFunction = (str, ...args) =>
+  const __n: (key: string, ...args: unknown[]) => string = (str, ...args) =>
     format(i18nHack[namespace].fixedT(escapeI18nKey(str)), ...args)
   i18nHack[namespace] = {
     fixedT,
@@ -170,7 +180,7 @@ export const addGlobalI18n = (namespace: string) => {
   }
 }
 
-if (window.isMain) {
+if (isMain) {
   each(mainPoiNs, (ns) => addGlobalI18n(ns))
 }
 

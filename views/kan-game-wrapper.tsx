@@ -1,3 +1,4 @@
+import type * as Utils from 'lib/utils'
 import type { ResizableAreaHandle, SizeState } from 'react-resizable-area'
 import type { Dispatch, AnyAction } from 'redux'
 import type { ButtonData } from 'views/components/etc/modal'
@@ -18,17 +19,24 @@ import { CustomTag } from 'views/components/etc/custom-tag'
 import ElectronWebView from 'views/components/etc/webview'
 import { getStore } from 'views/create-store'
 import i18next from 'views/env-parts/i18next'
+import { toggleModal } from 'views/env-parts/modal'
+import {
+  createLayoutUpdateAction,
+  createLayoutWebviewUpdateWebviewRefAction,
+} from 'views/redux/actions/layout'
 import { getRealSize, getYOffset } from 'views/services/utils'
 import { fileUrl } from 'views/utils/tools'
+
+import type { ConfigInstance } from './env'
 
 import { PoiAlert } from './components/info/alert'
 import { PoiControl } from './components/info/control'
 import { PoiMapReminder } from './components/info/map-reminder'
 import { PoiToast } from './components/info/toast'
+import { ipc } from './env'
 
-const config = remote.require('./lib/config')
-const ipc = remote.require('./lib/ipc')
-const { error } = remote.require('./lib/utils')
+const config: ConfigInstance = remote.require('./lib/config')
+const { error }: typeof Utils = remote.require('./lib/utils')
 const poiControlHeight = 30
 const preloadUrl = fileUrl(require.resolve('assets/js/webview-preload'))
 
@@ -88,7 +96,7 @@ const KanGame = styled(
   overflow: hidden;
   width: 100%;
 
-  .bp5-toast-container {
+  .bp6-toast-container {
     overflow: hidden !important;
   }
 `
@@ -181,15 +189,7 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
         width !== getStore('layout.webview.width') ||
         height !== getStore('layout.webview.height')
       ) {
-        this.props.dispatch({
-          type: '@@LayoutUpdate',
-          value: {
-            webview: {
-              width,
-              height,
-            },
-          },
-        })
+        this.props.dispatch(createLayoutUpdateAction({ webview: { width, height } }))
         this.setProperWindowSize(width, height)
         ipc.register('WebView', {
           width,
@@ -211,8 +211,8 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
       return
     }
 
-    const trusted: string[] = config.get('poi.misc.trustedCerts', [])
-    const untrusted: string[] = config.get('poi.misc.untrustedCerts', [])
+    const trusted: string[] = config.get('poi.misc.trustedCerts', []) ?? []
+    const untrusted: string[] = config.get('poi.misc.untrustedCerts', []) ?? []
     const hash = createHash('sha256').update(certificate.data).digest('base64')
     if (!trusted.includes(hash) && !untrusted.includes(hash)) {
       const title = i18next.t('others:Certificate error')
@@ -237,19 +237,19 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
           style: 'warning',
         },
       ]
-      window.toggleModal(title, content, footer)
+      toggleModal(title, content, footer)
     }
   }
 
   setTrustedCerts = (hash: string) => {
-    const trusted: string[] = config.get('poi.misc.trustedCerts', [])
+    const trusted: string[] = config.get('poi.misc.trustedCerts', []) ?? []
     const newTrusted = [...trusted, hash]
     config.set('poi.misc.trustedCerts', newTrusted)
     this.webview.current?.reload()
   }
 
   setUntrustedCerts = (hash: string) => {
-    const untrusted: string[] = config.get('poi.misc.untrustedCerts', [])
+    const untrusted: string[] = config.get('poi.misc.untrustedCerts', []) ?? []
     const newUntrusted = [...untrusted, hash]
     config.set('poi.misc.untrustedCerts', newUntrusted)
   }
@@ -265,15 +265,13 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
       const realWidth = getRealSize(webviewWidth)
       const realHeight = getRealSize(webviewHeight + getYOffset())
       if (layout === 'vertical' && realWidth > getRealSize(window.innerWidth)) {
-        let [width, height] = current.getContentSize()
-        width = realWidth
-        current.setContentSize(width, height)
+        const [_, height] = current.getContentSize()
+        current.setContentSize(realWidth, height)
       }
 
       if (layout !== 'vertical' && realHeight > getRealSize(getStore('layout.window.height'))) {
-        let [width, height] = current.getContentSize()
-        height = realHeight
-        current.setContentSize(width, height)
+        const [width, _] = current.getContentSize()
+        current.setContentSize(width, realHeight)
       }
     } else {
       current.setMinimumSize(1, 1)
@@ -292,13 +290,9 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
   }
 
   handleWebviewMount = () => {
-    this.props.dispatch({
-      type: '@@LayoutUpdate/webview/UpdateWebviewRef',
-      value: {
-        ref: this.webview.current,
-        ts: Date.now(),
-      },
-    })
+    this.props.dispatch(
+      createLayoutWebviewUpdateWebviewRefAction({ ref: this.webview.current, ts: Date.now() }),
+    )
     this.setProperWindowSize(
       Number.isNaN(getStore('layout.webview.width')) ? 1200 : getStore('layout.webview.width'),
       Number.isNaN(getStore('layout.webview.height')) ? 720 : getStore('layout.webview.height'),
@@ -307,13 +301,7 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
   }
 
   handleWebviewUnmount = () => {
-    this.props.dispatch({
-      type: '@@LayoutUpdate/webview/UpdateWebviewRef',
-      value: {
-        ref: false,
-        ts: Date.now(),
-      },
-    })
+    this.props.dispatch(createLayoutWebviewUpdateWebviewRefAction({ ref: null, ts: Date.now() }))
   }
 
   handleDidFrameFinishLoad = () => {
@@ -517,7 +505,9 @@ class KanGameWrapperInner extends Component<KanGameWrapperProps, KanGameWrapperS
             height: disableHeight,
           }}
           onResized={this.setRatio}
-          ref={(r: ResizableAreaHandle | null) => (this.resizableArea = r)}
+          ref={(r: ResizableAreaHandle | null) => {
+            this.resizableArea = r
+          }}
         >
           <KanGame tag="kan-game">
             <div

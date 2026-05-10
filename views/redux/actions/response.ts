@@ -1,4 +1,38 @@
 import type {
+  APIStart2GetDataRequest,
+  APIStart2GetDataResponse,
+  APIReqSortieBattleRequest,
+  APIReqSortieBattleResponse,
+  APIReqSortieAirbattleRequest,
+  APIReqSortieAirbattleResponse,
+  APIReqSortieLdAirbattleRequest,
+  APIReqSortieLdAirbattleResponse,
+  APIReqSortieGobackPortRequest,
+  APIReqSortieGobackPortResponse,
+  APIReqCombinedBattleBattleRequest,
+  APIReqCombinedBattleBattleResponse,
+  APIReqCombinedBattleBattleWaterRequest,
+  APIReqCombinedBattleBattleWaterResponse,
+  APIReqCombinedBattleEachBattleRequest,
+  APIReqCombinedBattleEachBattleResponse,
+  APIReqCombinedBattleEachBattleWaterRequest,
+  APIReqCombinedBattleEachBattleWaterResponse,
+  APIReqCombinedBattleEcBattleRequest,
+  APIReqCombinedBattleEcBattleResponse,
+  APIReqCombinedBattleLdAirbattleRequest,
+  APIReqCombinedBattleLdAirbattleResponse,
+  APIReqCombinedBattleMidnightBattleRequest,
+  APIReqCombinedBattleMidnightBattleResponse,
+  APIReqCombinedBattleEcMidnightBattleRequest,
+  APIReqCombinedBattleEcMidnightBattleResponse,
+  APIReqCombinedBattleGobackPortRequest,
+  APIReqCombinedBattleGobackPortResponse,
+  APIReqBattleMidnightBattleRequest,
+  APIReqBattleMidnightBattleResponse,
+  APIReqBattleMidnightSPMidnightRequest,
+  APIReqBattleMidnightSPMidnightResponse,
+  APIReqHenseiCombinedRequest,
+  APIReqHenseiCombinedResponse,
   APIGetMemberMapinfoRequest,
   APIGetMemberMapinfoResponse,
   APIReqAirCorpsSetPlaneRequest,
@@ -105,95 +139,13 @@ import type {
   APIReqHenseiPresetOrderChangeRequest,
   APIReqMemberUpdatedecknameResponse,
   APIReqMemberUpdatedecknameRequest,
+  APIReqKousyouRemodelSlotRecoverResponse,
+  APIReqKousyouRemodelSlotRecoverRequest,
 } from 'kcsapi'
-import type { APIShipDatum } from 'kcsapi/api_req_map/anchorage_repair/response'
 
 import { createAction } from '@reduxjs/toolkit'
 
-export interface GameResponsePayload<Body, PostBody> {
-  method: string
-  path: string
-  body: Body
-  postBody: PostBody
-  time: number
-}
-
-interface ConfigAction {
-  path: string
-  value: object
-}
-
-export const createConfigAction = createAction<ConfigAction>('@@Config')
-
-export const createInfoResourcesApplyDeltaAction = createAction<{ delta: number[] }>(
-  '@@info.resources@ApplyDelta',
-)
-
-export type InfoResourcesApplyDeltaAction = ReturnType<typeof createInfoResourcesApplyDeltaAction>
-
-// Internal action (not from kcsapi package) used by equipsCrossSliceMiddleware.
-export const createInfoEquipsRemoveByIdsAction = createAction<{ ids: Array<string | number> }>(
-  '@@info.equips@RemoveByIds',
-)
-
-export type InfoEquipsRemoveByIdsAction = ReturnType<typeof createInfoEquipsRemoveByIdsAction>
-
-// Internal action used by shipsCrossSliceMiddleware and repairs observer.
-export const createInfoShipsRepairCompletedAction = createAction<{ api_ship_id: number }>(
-  '@@info.ships@RepairCompleted',
-)
-
-export type InfoShipsRepairCompletedAction = ReturnType<typeof createInfoShipsRepairCompletedAction>
-
-export type QuestEvent =
-  | 'practice'
-  | 'practice_win'
-  | 'practice_win_a'
-  | 'practice_win_s'
-  | 'mission_success'
-  | 'repair'
-  | 'supply'
-  | 'create_item'
-  | 'create_ship'
-  | 'destroy_ship'
-  | 'remodel_item'
-  | 'remodel_ship'
-  | 'destory_item'
-  | 'sally'
-  | 'reach_mapcell'
-  | 'battle'
-  | 'battle_win'
-  | 'battle_rank_s'
-  | 'battle_boss'
-  | 'battle_boss_win'
-  | 'battle_boss_win_rank_a'
-  | 'battle_boss_win_rank_s'
-  | 'sinking'
-
-export interface QuestOptions {
-  shipname?: string[]
-  shiptype?: number[]
-  shipclass?: number[]
-  mission?: string
-  maparea?: number
-  mapcell?: number
-  slotitemType2?: number
-  times?: number
-  shipType?: number
-}
-
-export const createInfoQuestsDailyRefreshAction = createAction<{ now: number }>(
-  '@@info.quests@DailyRefresh',
-)
-
-export const createInfoQuestsApplyProgressAction = createAction<{
-  event: QuestEvent
-  options: QuestOptions | null
-  delta: number
-}>('@@info.quests@ApplyProgress')
-
-export type InfoQuestsDailyRefreshAction = ReturnType<typeof createInfoQuestsDailyRefreshAction>
-export type InfoQuestsApplyProgressAction = ReturnType<typeof createInfoQuestsApplyProgressAction>
+import type { GameResponsePayload } from './types'
 
 export const createAPIGetMemberMapinfoResponseAction = createAction<
   GameResponsePayload<APIGetMemberMapinfoResponse, APIGetMemberMapinfoRequest>
@@ -387,32 +339,22 @@ export const createAPIReqKousyouRemodelSlotResponseAction = createAction<
   GameResponsePayload<APIReqKousyouRemodelSlotResponse, APIReqKousyouRemodelSlotRequest>
 >('@@Response/kcsapi/api_req_kousyou/remodel_slot')
 
-// NOTE: response-saver payloads include these optional fields, but kcsapi types do not.
-export type APIReqKousyouRemodelSlotlistDetailResponseCompat =
-  APIReqKousyouRemodelSlotlistDetailResponse & {
-    api_req_useitem_id?: number
-    api_req_useitem_num?: number
-    api_req_useitem_id2?: number
-    api_req_useitem_num2?: number
-  }
-
 export const createAPIReqKousyouRemodelSlotlistDetailResponseAction = createAction<
   GameResponsePayload<
-    APIReqKousyouRemodelSlotlistDetailResponseCompat,
+    APIReqKousyouRemodelSlotlistDetailResponse,
     APIReqKousyouRemodelSlotlistDetailRequest
   >
 >('@@Response/kcsapi/api_req_kousyou/remodel_slotlist_detail')
 
-// NOTE: response-saver payloads sometimes omit fields that kcsapi requires (e.g. api_sally_area).
-export type APIReqMapAnchorageRepairResponseCompat = Omit<
-  APIReqMapAnchorageRepairResponse,
-  'api_ship_data'
-> & {
-  api_ship_data: Array<Partial<APIShipDatum> & { api_id: number }>
-}
+export const createAPIReqKousyouRemodelSlotRecoverResponseAction = createAction<
+  GameResponsePayload<
+    APIReqKousyouRemodelSlotRecoverResponse,
+    APIReqKousyouRemodelSlotRecoverRequest
+  >
+>('@@Response/kcsapi/api_req_kousyou/remodel_slot_recover')
 
 export const createAPIReqMapAnchorageRepairResponseAction = createAction<
-  GameResponsePayload<APIReqMapAnchorageRepairResponseCompat, APIReqMapAnchorageRepairRequest>
+  GameResponsePayload<APIReqMapAnchorageRepairResponse, APIReqMapAnchorageRepairRequest>
 >('@@Response/kcsapi/api_req_map/anchorage_repair')
 
 export const createAPIReqMapSelectEventmapRankResponseAction = createAction<
@@ -446,3 +388,110 @@ export const createAPIReqQuestClearitemgetResponseAction = createAction<
 export const createAPIReqQuestStopResponseAction = createAction<
   GameResponsePayload<APIReqQuestStopResponse, APIReqQuestStopRequest>
 >('@@Response/kcsapi/api_req_quest/stop')
+
+export const createAPIStart2GetDataResponseAction = createAction<
+  GameResponsePayload<APIStart2GetDataResponse, APIStart2GetDataRequest>
+>('@@Response/kcsapi/api_start2/getData')
+
+export const createAPIReqSortieGobackPortResponseAction = createAction<
+  GameResponsePayload<APIReqSortieGobackPortResponse, APIReqSortieGobackPortRequest>
+>('@@Response/kcsapi/api_req_sortie/goback_port')
+
+export const createAPIReqCombinedBattleGobackPortResponseAction = createAction<
+  GameResponsePayload<APIReqCombinedBattleGobackPortResponse, APIReqCombinedBattleGobackPortRequest>
+>('@@Response/kcsapi/api_req_combined_battle/goback_port')
+
+export const createAPIReqHenseiCombinedResponseAction = createAction<
+  GameResponsePayload<APIReqHenseiCombinedResponse, APIReqHenseiCombinedRequest>
+>('@@Response/kcsapi/api_req_hensei/combined')
+
+export const createAPIReqSortieBattleResponseAction = createAction<
+  GameResponsePayload<APIReqSortieBattleResponse, APIReqSortieBattleRequest>
+>('@@Response/kcsapi/api_req_sortie/battle')
+
+export const createAPIReqSortieAirbattleResponseAction = createAction<
+  GameResponsePayload<APIReqSortieAirbattleResponse, APIReqSortieAirbattleRequest>
+>('@@Response/kcsapi/api_req_sortie/airbattle')
+
+export const createAPIReqSortieLdAirbattleResponseAction = createAction<
+  GameResponsePayload<APIReqSortieLdAirbattleResponse, APIReqSortieLdAirbattleRequest>
+>('@@Response/kcsapi/api_req_sortie/ld_airbattle')
+
+export const createAPIReqCombinedBattleBattleResponseAction = createAction<
+  GameResponsePayload<APIReqCombinedBattleBattleResponse, APIReqCombinedBattleBattleRequest>
+>('@@Response/kcsapi/api_req_combined_battle/battle')
+
+export const createAPIReqCombinedBattleBattleWaterResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleBattleWaterResponse,
+    APIReqCombinedBattleBattleWaterRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/battle_water')
+
+// FIXME: Not in kcsapi package - @@Response/kcsapi/api_req_combined_battle/airbattle
+export const createAPIReqCombinedBattleAirbattleResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleLdAirbattleResponse,
+    APIReqCombinedBattleLdAirbattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/airbattle')
+
+export const createAPIReqCombinedBattleLdAirbattleResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleLdAirbattleResponse,
+    APIReqCombinedBattleLdAirbattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/ld_airbattle')
+
+export const createAPIReqCombinedBattleEcBattleResponseAction = createAction<
+  GameResponsePayload<APIReqCombinedBattleEcBattleResponse, APIReqCombinedBattleEcBattleRequest>
+>('@@Response/kcsapi/api_req_combined_battle/ec_battle')
+
+export const createAPIReqCombinedBattleEachBattleResponseAction = createAction<
+  GameResponsePayload<APIReqCombinedBattleEachBattleResponse, APIReqCombinedBattleEachBattleRequest>
+>('@@Response/kcsapi/api_req_combined_battle/each_battle')
+
+export const createAPIReqCombinedBattleEachBattleWaterResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleEachBattleWaterResponse,
+    APIReqCombinedBattleEachBattleWaterRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/each_battle_water')
+
+export const createAPIReqBattleMidnightBattleResponseAction = createAction<
+  GameResponsePayload<APIReqBattleMidnightBattleResponse, APIReqBattleMidnightBattleRequest>
+>('@@Response/kcsapi/api_req_battle_midnight/battle')
+
+export const createAPIReqBattleMidnightSPMidnightResponseAction = createAction<
+  GameResponsePayload<APIReqBattleMidnightSPMidnightResponse, APIReqBattleMidnightSPMidnightRequest>
+>('@@Response/kcsapi/api_req_battle_midnight/sp_midnight')
+
+export const createAPIReqCombinedBattleMidnightBattleResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleMidnightBattleResponse,
+    APIReqCombinedBattleMidnightBattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/midnight_battle')
+
+// FIXME: Not in kcsapi package - @@Response/kcsapi/api_req_combined_battle/sp_midnight
+export const createAPIReqCombinedBattleSPMidnightResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleMidnightBattleResponse,
+    APIReqCombinedBattleMidnightBattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/sp_midnight')
+
+export const createAPIReqCombinedBattleEcMidnightBattleResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleEcMidnightBattleResponse,
+    APIReqCombinedBattleEcMidnightBattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/ec_midnight_battle')
+
+// FIXME: Not in kcsapi package - @@Response/kcsapi/api_req_combined_battle/ec_night_to_day
+export const createAPIReqCombinedBattleEcNightToDayResponseAction = createAction<
+  GameResponsePayload<
+    APIReqCombinedBattleEcMidnightBattleResponse,
+    APIReqCombinedBattleEcMidnightBattleRequest
+  >
+>('@@Response/kcsapi/api_req_combined_battle/ec_night_to_day')

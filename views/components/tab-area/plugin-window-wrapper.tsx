@@ -1,7 +1,8 @@
 import type { ConfigPath, ConfigValue } from 'lib/config'
-import type { IPCType } from 'lib/ipc'
+import type * as WebContentUtils from 'lib/webcontent-utils'
 import type { Plugin } from 'views/services/plugin-manager'
 
+import { BlueprintProvider } from '@blueprintjs/core'
 import * as remote from '@electron/remote'
 import { TitleBar } from 'electron-react-titlebar/renderer'
 import config from 'lib/config'
@@ -17,14 +18,14 @@ import React, {
 import ReactDOM from 'react-dom'
 import { StyleSheetManager, styled } from 'styled-components'
 import { appMenu } from 'views/components/etc/menu'
-import { WindowEnv } from 'views/components/etc/window-env'
+import { ROOT, ipc } from 'views/env'
 import { loadStyle } from 'views/env-parts/theme'
 import { fileUrl } from 'views/utils/tools'
 
+import { WindowEnv } from '../etc/window-env'
 import { PluginWrap } from './plugin-wrapper'
 
 const { BrowserWindow, screen } = remote
-const ipc: IPCType = remote.require('./lib/ipc')
 const { workArea } = screen.getPrimaryDisplay()
 
 interface WindowRect {
@@ -64,6 +65,13 @@ const PoiAppTabpane = styled.div`
   overflow: hidden;
 `
 
+const FloatContainer = styled.div`
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 1000;
+`
+
 const stylesheetTagsWithID = [
   'bootstrap',
   'normalize',
@@ -87,6 +95,8 @@ const stylesheetTagsWithHref = [
 interface Props {
   plugin: Plugin
   closeWindowPortal: () => void
+  titleExtra?: React.ReactNode
+  pinned: boolean
 }
 
 export interface PluginWindowWrapHandle {
@@ -94,7 +104,7 @@ export interface PluginWindowWrapHandle {
 }
 
 export const PluginWindowWrap = forwardRef<PluginWindowWrapHandle, Props>(
-  ({ plugin, closeWindowPortal }, ref) => {
+  ({ plugin, closeWindowPortal, titleExtra, pinned }, ref) => {
     const containerElRef = useRef<HTMLDivElement | null>(null)
     if (!containerElRef.current) {
       const el = document.createElement('div')
@@ -105,7 +115,7 @@ export const PluginWindowWrap = forwardRef<PluginWindowWrapHandle, Props>(
     const containerEl = containerElRef.current
 
     const externalWindowRef = useRef<Window | null>(null)
-    const currentWindowRef = useRef<Electron.BrowserWindow | undefined>()
+    const currentWindowRef = useRef<Electron.BrowserWindow | undefined>(undefined)
     const pluginContainer = useRef<HTMLDivElement>(null)
 
     const [loaded, setLoaded] = useState(false)
@@ -129,6 +139,9 @@ export const PluginWindowWrap = forwardRef<PluginWindowWrapHandle, Props>(
       () => ({
         focusWindow: () => {
           if (checkBrowserWindowExistence()) {
+            if (currentWindowRef.current!.isMinimized()) {
+              currentWindowRef.current!.restore()
+            }
             currentWindowRef.current?.focus()
           } else {
             setImmediate(() => {
@@ -204,10 +217,13 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
           ;(externalWindowRef.current as any).isWindowMode = true
           loadStyle(externalWindowRef.current.document, currentWindow, false)
-          remote.require('./lib/webcontent-utils').stopFileNavigate(currentWindow?.webContents.id)
+          const { stopFileNavigate }: typeof WebContentUtils =
+            remote.require('./lib/webcontent-utils')
+          stopFileNavigate(currentWindow?.webContents.id ?? -1)
           externalWindowRef.current.addEventListener('beforeunload', () => {
             setLoaded(false)
-            config.set(`plugin.${plugin.id}.bounds`, currentWindowRef.current?.getBounds())
+            const bounds = currentWindowRef.current?.getBounds()
+            config.set(`plugin.${plugin.id}.bounds`, bounds)
             try {
               closeWindowPortal()
             } catch (e) {
@@ -231,7 +247,11 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
       return () => {
         config.removeListener('config.set', handleZoom)
         try {
-          externalWindowRef.current?.close()
+          if (externalWindowRef.current) {
+            externalWindowRef.current.onbeforeunload = null
+            currentWindowRef.current?.setClosable(true)
+            externalWindowRef.current.close()
+          }
         } catch (e) {
           console.error(e)
         }
@@ -250,26 +270,37 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
     )
 
     return ReactDOM.createPortal(
-      <>
-        {showCustomTitleBar && currentWindowRef.current && (
-          <TitleBar
-            icon={join(ROOT, 'assets', 'icons', 'poi_32x32.png')}
-            browserWindowId={currentWindowRef.current.id}
-          />
-        )}
-        <WindowEnv.Provider
-          value={{
-            window: externalWindowRef.current,
-            mountPoint: containerEl,
-          }}
-        >
+      <WindowEnv.Provider
+        value={{
+          window: externalWindowRef.current,
+          mountPoint: containerEl,
+        }}
+      >
+        <BlueprintProvider portalContainer={containerEl}>
           <StyleSheetManager target={externalWindowRef.current.document.head}>
+            {showCustomTitleBar && currentWindowRef.current ? (
+              <TitleBar
+                icon={join(ROOT, 'assets', 'icons', 'poi_32x32.png')}
+                browserWindowId={currentWindowRef.current.id}
+                {...(pinned
+                  ? {
+                      disableClose: true,
+                      disableMaximize: true,
+                      disableMinimize: true,
+                    }
+                  : undefined)}
+              >
+                {titleExtra}
+              </TitleBar>
+            ) : (
+              <FloatContainer>{titleExtra}</FloatContainer>
+            )}
             <PoiAppTabpane className="poi-app-tabpane" ref={pluginContainer}>
               <PluginWrap key={plugin.id} plugin={plugin} />
             </PoiAppTabpane>
           </StyleSheetManager>
-        </WindowEnv.Provider>
-      </>,
+        </BlueprintProvider>
+      </WindowEnv.Provider>,
       mountPoint,
     )
   },

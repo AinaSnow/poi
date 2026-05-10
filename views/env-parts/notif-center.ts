@@ -3,7 +3,9 @@ import type { ConfigValue } from 'lib/config'
 import * as remote from '@electron/remote'
 import { get, memoize, throttle, debounce, pickBy } from 'lodash'
 import { join } from 'path'
-import { config } from 'views/env-parts/config'
+
+import { config } from './config'
+import { ROOT } from './const'
 
 const NOTIFY_DEFAULT_ICON = join(ROOT, 'assets', 'icons', 'icon.png')
 
@@ -28,6 +30,7 @@ const defaultNotifOptions = {
   title: 'poi',
   icon: NOTIFY_DEFAULT_ICON,
   audio: `file://${ROOT}/assets/audio/poi.mp3`,
+  volume: config.get('poi.notify.volume', 0.8),
   type: 'others',
 }
 
@@ -154,6 +157,16 @@ class NotificationCenter {
 const notifCenter = new NotificationCenter()
 
 export default notifCenter
+
+declare global {
+  interface Window {
+    /** @deprecated Use `import notifCenter from 'views/env-parts/notif-center'` and call `notifCenter.notify(...)` instead */
+    notify: (
+      msg: string,
+      options?: { type?: keyof ConfigValue<'poi.notify'>; volume?: number },
+    ) => void
+  }
+}
 
 // Backward compatibility
 window.notify = (

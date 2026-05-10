@@ -121,6 +121,9 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 app.commandLine.appendSwitch('disable-site-isolation-trials')
 
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+
+// Enable experimental require() features, which is required by some dependencies
+app.commandLine.appendSwitch('experimental-require-module')
 ;(() => {
   /*
     Configure extra command flags.
@@ -268,6 +271,7 @@ app.on('ready', () => {
     },
     backgroundColor: '#00000000',
     backgroundMaterial: config.get('poi.appearance.vibrant', 0) ? 'acrylic' : 'none',
+    vibrancy: 'window',
     roundedCorners: true,
   })
 

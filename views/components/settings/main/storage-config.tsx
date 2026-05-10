@@ -8,10 +8,11 @@ import { styled } from 'styled-components'
 import { FolderPickerConfig } from 'views/components/settings/components/folder-picker'
 import { IntegerConfig } from 'views/components/settings/components/integer'
 import { Section, Wrapper, FillAvailable } from 'views/components/settings/components/section'
+import { toggleModal } from 'views/env-parts/modal'
 
 declare const APPDATA_PATH: string
 
-const { session } = remote.require('electron')
+const { session } = remote
 
 const _rawCachePath = remote.getGlobal('DEFAULT_CACHE_PATH')
 const defaultCachePath = typeof _rawCachePath === 'string' ? _rawCachePath : ''
@@ -21,12 +22,12 @@ const ButtonArea = styled(Wrapper)`
     margin-left: 10px;
   }
 
-  .bp5-callout {
+  .bp6-callout {
     margin-top: 0.5em;
   }
 `
 const InlineFormGroup = styled(FormGroup)`
-  .bp5-form-content {
+  .bp6-form-content {
     display: flex;
     align-items: center;
   }
@@ -48,6 +49,7 @@ export const StorageConfig = () => {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleUpdateCacheSize().catch(() => null)
     const cycle = setInterval(handleUpdateCacheSize, 6000000)
     return () => clearInterval(cycle)
@@ -60,7 +62,7 @@ export const StorageConfig = () => {
       .getCurrentWebContents()
       .session.clearStorageData({ storages: ['cookies'] })
       .then(() => {
-        window.toggleModal(t('Delete cookies'), t('Success!'), [])
+        toggleModal(t('Delete cookies'), t('Success!'), [])
       })
   }
 
@@ -69,7 +71,7 @@ export const StorageConfig = () => {
       .getCurrentWebContents()
       .session.clearCache()
       .then(() => {
-        window.toggleModal(t('Delete cache'), t('Success!'), [])
+        toggleModal(t('Delete cache'), t('Success!'), [])
       })
   }
 

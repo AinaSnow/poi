@@ -1,5 +1,10 @@
-jest.mock('views/env-parts/config', () => ({
+jest.mock('views/env', () => ({
   config: { get: jest.fn() },
+}))
+jest.mock('views/create-store', () => ({
+  getStore: jest.fn(),
+  store: { getState: jest.fn(), subscribe: jest.fn(), dispatch: jest.fn() },
+  dispatch: jest.fn(),
 }))
 
 import type { APISlotItem } from 'kcsapi/api_get_member/require_info/response'

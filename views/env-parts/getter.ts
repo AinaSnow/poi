@@ -1,5 +1,6 @@
 import type { APISlotItem } from 'kcsapi/api_get_member/require_info/response'
 import type { APIShip } from 'kcsapi/api_port/port/response'
+import type { APIMstShip, APIMstSlotitem } from 'kcsapi/api_start2/getData/response'
 import type { RootState } from 'views/redux/reducer-factory'
 
 import * as remote from '@electron/remote'
@@ -7,10 +8,10 @@ import { map, get, mapValues } from 'lodash'
 import { observer, observe } from 'redux-observers'
 import { createSelector } from 'reselect'
 import { store, getStore } from 'views/create-store'
-import { config } from 'views/env-parts/config'
 import { buildArray } from 'views/utils/tools'
 
-const ipc = remote.require('./lib/ipc')
+import { config } from './config'
+import { ipc } from './ipc'
 
 function object2Array(obj: Record<string, unknown>) {
   return buildArray(map(obj, (v, k) => [Number(k), v]))
@@ -167,6 +168,19 @@ Object.defineProperty(window, '_serverName', {
     return getStore('info.server.name')
   },
 })
+
+declare global {
+  interface Window {
+    /** @deprecated Use `store.info.ships` instead */
+    _ships: Record<`${number}` | number, APIShip>
+    /** @deprecated Use `store.info.equips` instead */
+    _slotitems: Record<`${number}` | number, APISlotItem>
+    /** @deprecated Use `store.const.$ships` instead */
+    $ships: Record<`${number}` | number, APIMstShip>
+    /** @deprecated Use `store.const.$equips` instead */
+    $slotitems: Record<`${number}` | number, APIMstSlotitem>
+  }
+}
 
 const initShips = () => {
   window._ships = new Proxy(

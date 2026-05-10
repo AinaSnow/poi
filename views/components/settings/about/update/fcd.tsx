@@ -1,3 +1,4 @@
+import type { FcdValue } from 'views/redux/fcd'
 import type { RootState } from 'views/redux/reducer-factory'
 
 import { Button, Intent, Tooltip } from '@blueprintjs/core'
@@ -12,6 +13,8 @@ import {
   InfoTooltipEntry,
   InfoTooltipItem,
 } from 'views/components/etc/styled-components'
+import { ROOT } from 'views/env'
+import { createUpdateFCDAction } from 'views/redux/actions/app'
 
 const serverList = [
   'https://update.poi.moe/fcd/',
@@ -42,23 +45,21 @@ export const FCD = () => {
         const localFileList = globSync(`${ROOT}/assets/data/fcd/*`)
         for (const file of localFileList) {
           if (!file.includes('meta.json')) {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const data = require(file) as { meta?: { version?: string; name?: string } }
-            const dataVersion = get(data, 'meta.version')
-            const name = get(data, 'meta.name')
+            const data = require(file) as FcdValue
+            const dataVersion = data?.meta?.version
+            const name = data?.meta?.name
             if (name && dataVersion) {
-              const localVersion = get(version, name, '1970/01/01/01')
+              const localVersion = version[name] ?? '1970/01/01/01'
               if (dataVersion > localVersion) {
-                dispatch({ type: '@@updateFCD', value: data })
+                dispatch(createUpdateFCDAction(data))
               }
             }
           }
         }
 
-        let flag = false
         for (const server of serverList) {
-          flag = true
+          let flag = true
           const fileList = await fetch(`${server}meta.json`, defaultFetchOption)
             .then((res) =>
               res.ok
@@ -80,7 +81,10 @@ export const FCD = () => {
                   .then((res) => (res.ok ? res.json() : undefined))
                   .catch(() => undefined)
                 if (data) {
-                  dispatch({ type: '@@updateFCD', value: data })
+                  dispatch(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                    createUpdateFCDAction(data as Parameters<typeof createUpdateFCDAction>[0]),
+                  )
                 } else {
                   flag = false
                 }

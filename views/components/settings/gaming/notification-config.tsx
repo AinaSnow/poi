@@ -7,9 +7,11 @@ import { styled } from 'styled-components'
 import { IntegerConfig } from 'views/components/settings/components/integer'
 import { Section, Wrapper, HalfWrapper } from 'views/components/settings/components/section'
 import { SwitchConfig } from 'views/components/settings/components/switch'
+import { config } from 'views/env'
+import notifCenter from 'views/env-parts/notif-center'
 
 const InlineFormGroup = styled(FormGroup)`
-  .bp5-form-content {
+  .bp6-form-content {
     display: flex;
     align-items: center;
   }
@@ -82,7 +84,7 @@ export const NotificationConfig = () => {
   }
 
   const handleEndChangeNotifyVolume = () => {
-    window.notify('')
+    notifCenter.notify({ message: '' })
   }
 
   return (

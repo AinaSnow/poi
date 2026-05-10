@@ -1,7 +1,8 @@
 import * as remote from '@electron/remote'
 import { debounce } from 'lodash'
 import { dispatch, getStore } from 'views/create-store'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
+import { createLayoutWebviewUseFixedResolutionAction } from 'views/redux/actions/layout'
 
 import { getPoiInfoHeight, getYOffset, getRealSize } from './utils'
 
@@ -145,10 +146,11 @@ const handleOverlayPanelResizeDebounced = debounce(handleOverlayPanelResize, 200
 const adjustSize = () => {
   try {
     setCSSDebounced()
-    dispatch({
-      type: '@@LayoutUpdate/webview/useFixedResolution',
-      value: getStore('config.poi.webview.useFixedResolution'),
-    })
+    dispatch(
+      createLayoutWebviewUseFixedResolutionAction(
+        Boolean(getStore('config.poi.webview.useFixedResolution')),
+      ),
+    )
     handleOverlayPanelResizeDebounced()
   } catch (error) {
     console.error(error)
@@ -173,7 +175,7 @@ const changeBounds = () => {
 window.addEventListener('game.start', adjustSize)
 window.addEventListener('resize', adjustSize)
 
-config.on('config.set', (path: string, value: unknown) => {
+config.on('config.set', (path, value) => {
   switch (path) {
     case 'poi.appearance.zoom': {
       const [width, height] = remote.getCurrentWindow().getContentSize()

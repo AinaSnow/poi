@@ -1,3 +1,4 @@
+import type * as Updater from 'lib/updater'
 import type { ButtonData } from 'views/components/etc/modal'
 
 import * as remote from '@electron/remote'
@@ -6,8 +7,9 @@ import fetch from 'node-fetch'
 import React from 'react'
 import Markdown from 'react-remarkable'
 import semver from 'semver'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
 import i18next from 'views/env-parts/i18next'
+import { toggleModal } from 'views/env-parts/modal'
 
 const fetchHeaders: Record<string, string> = {
   'Cache-Control': 'max-age=0',
@@ -19,7 +21,8 @@ const defaultFetchOption = {
   headers: fetchHeaders,
 }
 
-const { updater } = process.platform !== 'linux' ? remote.require('./lib/updater') : {}
+const { updater }: typeof Updater =
+  process.platform !== 'linux' ? remote.require('./lib/updater') : {}
 const LANG = ['zh-CN', 'zh-TW', 'en-US']
 const doUpdate = async () => {
   if (process.platform == 'win32') {
@@ -68,14 +71,15 @@ export const checkUpdate = async () => {
     `https://${UPDATE_SERVER}/update/latest.json`,
     defaultFetchOption as Parameters<typeof fetch>[1],
   )
-    .then((res) => res.json())
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    .then((res) => res.json() as Promise<{ version?: string; betaVersion?: string }>)
     .catch((e: Error) => {
       console.warn('Check update error.', e.stack)
-      return {}
+      return {} as { version?: string; betaVersion?: string }
     })
   if (versionInfo.version) {
     const version =
-      betaChannel && semver.gt(versionInfo.betaVersion, versionInfo.version)
+      betaChannel && semver.gt(versionInfo.betaVersion ?? '0.0.0', versionInfo.version ?? '0.0.0')
         ? versionInfo.betaVersion || 'v0.0.0'
         : versionInfo.version
     const channel = version.includes('beta') ? '-beta' : ''
@@ -122,7 +126,7 @@ const toggleUpdate = (version: string, log: string) => {
       style: 'primary',
     })
   }
-  window.toggleModal(title, content, footer)
+  toggleModal(title, content, footer)
 }
 
 if (config.get('poi.update.enable', true)) {

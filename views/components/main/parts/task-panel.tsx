@@ -8,7 +8,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { createSelector } from 'reselect'
 import { css, styled } from 'styled-components'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
 import i18next from 'views/env-parts/i18next'
 import {
   configLayoutSelector,
@@ -176,11 +176,9 @@ const taskRowLayoutSelector = createSelector(
     (state: RootState) => state.config?.poi?.mainpanel?.layout ?? defaultLayout,
   ],
   (layout, reversed, mainPanelWidth, mainPanelLayout) => {
-    const taskPanelLayout = (
-      mainPanelLayout[mainPanelWidth > 750 ? 'lg' : 'sm'] as
-        | Array<{ i: string; x: number }>
-        | undefined
-    )?.find((panel) => panel.i === 'task-panel')
+    const taskPanelLayout = mainPanelLayout[mainPanelWidth > 750 ? 'lg' : 'sm']?.find(
+      (panel) => panel.i === 'task-panel',
+    )
     const colCnt = mainPanelWidth > 750 ? 20 : 10
     const colWidth = mainPanelWidth / colCnt
     const leftDist = (taskPanelLayout?.x ?? 0) * colWidth
@@ -206,7 +204,7 @@ const TaskRowBase = ({
   idx: number
   bulletColor?: string
   leftLabel?: string
-  leftOverlay?: React.ReactElement
+  leftOverlay?: React.JSX.Element | string
   rightLabel?: React.ReactNode
   rightOverlay?: string[]
   rightIntent?: Intent

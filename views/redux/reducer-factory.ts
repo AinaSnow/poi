@@ -1,9 +1,10 @@
-import type { Config } from 'views/env-parts/config'
+import type { Config } from 'views/env'
 import type { Plugin } from 'views/services/plugin-manager/utils'
 
 import { mapValues } from 'lodash'
 
 import { createConfigAction } from './actions'
+import { createConfigDeleteAction } from './actions/config'
 import { reducer as battle, type BattleState } from './battle'
 import { combineReducers, type PoiReducer } from './combine-reducers'
 import { reducer as config } from './config'
@@ -174,4 +175,12 @@ export function onConfigChange({
 }): ReturnType<typeof createConfigAction> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return createConfigAction({ path, value: value as object })
+}
+
+export function onConfigDelete({
+  path,
+}: {
+  path: string
+}): ReturnType<typeof createConfigDeleteAction> {
+  return createConfigDeleteAction({ path })
 }

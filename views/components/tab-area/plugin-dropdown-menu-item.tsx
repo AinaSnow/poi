@@ -6,13 +6,14 @@ import React, { type FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
 import { css, styled } from 'styled-components'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
 
 interface Props {
   plugin: Plugin
   onClick: () => void
   id?: string
   grid?: boolean
+  handlePluginPin: (plugin: Plugin) => void
 }
 
 type Mode = 'legacy-window' | 'window' | 'tab'
@@ -43,12 +44,12 @@ const PluginMenuItem = styled(MenuItem)<{ grid?: boolean }>`
             right: 15px;
           }
 
-          .bp5-menu-item-icon {
+          .bp6-menu-item-icon {
             margin-right: 0;
             height: auto;
           }
 
-          .bp5-text-overflow-ellipsis {
+          .bp6-text-overflow-ellipsis {
             margin-right: 0;
             height: auto;
             line-height: 1.4;
@@ -70,10 +71,11 @@ const PluginMenuItem = styled(MenuItem)<{ grid?: boolean }>`
         `}
 `
 
-const PluginDropdownMenuItem: FC<Props> = ({ plugin, onClick, id, grid }) => {
+const PluginDropdownMenuItem: FC<Props> = ({ plugin, onClick, id, grid, handlePluginPin }) => {
   const { t } = useTranslation('setting')
   const pluginConfig = useSelector((state: RootState) => state.config?.poi?.plugin)
   const isFavorite = pluginConfig?.favorite?.[plugin.id]
+  const pinConfig = pluginConfig?.pin?.[plugin.id]
   const mode: Mode = plugin.handleClick
     ? 'legacy-window'
     : (pluginConfig?.windowmode?.[plugin.id] ?? plugin.windowMode)
@@ -105,6 +107,17 @@ const PluginDropdownMenuItem: FC<Props> = ({ plugin, onClick, id, grid }) => {
           }}
         />
       )}
+      {mode === 'window' && (
+        <MenuItem
+          icon={pinConfig ? 'pin' : 'unpin'}
+          text={pinConfig ? t('Unpin') : t('Pin')}
+          onClick={(e) => {
+            e.preventDefault()
+            if (mode !== 'window') return
+            handlePluginPin(plugin)
+          }}
+        />
+      )}
     </Menu>
   )
 
@@ -120,6 +133,7 @@ const PluginDropdownMenuItem: FC<Props> = ({ plugin, onClick, id, grid }) => {
         labelElement={
           <StatusIndicator>
             {isFavorite && <Icon icon="star" />}
+            {mode === 'window' && pinConfig && <Icon icon="pin" />}
             {mode === 'legacy-window' && <Icon icon="open-application" />}
             {mode === 'window' && <Icon icon="applications" />}
           </StatusIndicator>

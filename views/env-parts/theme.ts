@@ -6,13 +6,15 @@ import themes from 'assets/data/theme.json'
 import classNames from 'classnames'
 import { accessSync, ensureFileSync } from 'fs-extra'
 import { join } from 'path'
-import { config } from 'views/env-parts/config'
 
 import { fileUrl } from '../utils/tools'
+import { config } from './config'
 
 declare global {
   interface Window {
+    /** @deprecated Use `config.set('poi.appearance.theme', theme)` instead */
     applyTheme: (theme: string) => void
+    /** @deprecated Read from `config.get('poi.appearance.theme')` and check if it is a dark theme instead */
     isDarkTheme: boolean
   }
 }
@@ -35,7 +37,6 @@ export function loadStyle(
   currentWindow: BrowserWindow = remote.getCurrentWindow(),
   isMainWindow = true,
 ): void {
-  const $ = (s: string): Element | null => doc.querySelector(s)
   const customCSSPath = join(EXROOT, 'hack', 'custom.css')
   ensureFileSync(customCSSPath)
   const customCSS = doc.createElement('link')
@@ -78,10 +79,10 @@ export function loadStyle(
   div.style.display = 'none'
 
   const reloadCustomCss = () => {
-    if (!$('#custom-css')) {
+    if (!doc.querySelector('#custom-css')) {
       return
     }
-    $('#custom-css')!.setAttribute('href', `file://${EXROOT}/hack/custom.css`)
+    doc.querySelector('#custom-css')!.setAttribute('href', `file://${EXROOT}/hack/custom.css`)
   }
 
   const delaySetClassName = (className: string) => {
@@ -134,6 +135,26 @@ export function loadStyle(
     }
   }
 
+  const blueprintVibrantCSSPath = require.resolve('assets/css/blueprint-vibrant.css')
+
+  const updateBlueprintVibrantTokens = (isVibrant?: boolean | number) => {
+    const linkId = 'blueprint-vibrant-css'
+    let linkEl = doc.querySelector(`#${linkId}`) as HTMLLinkElement | null
+
+    if (!isVibrant) {
+      linkEl?.remove()
+      return
+    }
+
+    if (!linkEl) {
+      linkEl = doc.createElement('link')
+      linkEl.id = linkId
+      linkEl.rel = 'stylesheet'
+      linkEl.href = fileUrl(blueprintVibrantCSSPath)
+      doc.head.appendChild(linkEl)
+    }
+  }
+
   const loadTheme = (theme = 'dark', isVibrant?: boolean | number) => {
     theme = themes.includes(theme) ? theme : 'dark'
     isVibrant = typeof isVibrant === 'boolean' ? isVibrant : config.get('poi.appearance.vibrant', 0)
@@ -143,11 +164,11 @@ export function loadStyle(
     glass.style.backgroundColor = isDark ? 'rgb(47, 52, 60)' : 'rgb(246, 247, 249)'
     setFilter(config.get('poi.appearance.colorblindFilter'))
     delaySetClassName(
-      classNames('bp5-focus-disabled', {
-        'bp5-dark': isDark,
+      classNames('bp6-focus-disabled', {
+        'bp6-dark': isDark,
       }),
     )
-    const bootstrapEl = $('#bootstrap-css')
+    const bootstrapEl = doc.querySelector('#bootstrap-css')
     if (bootstrapEl) {
       setRef(
         bootstrapEl,
@@ -158,28 +179,22 @@ export function loadStyle(
         ),
       )
     }
-    const blueprintEl = $('#blueprint-css')
+    const blueprintEl = doc.querySelector('#blueprint-css')
     if (blueprintEl) {
-      setRef(
-        blueprintEl,
-        fileUrl(
-          require.resolve(
-            `poi-asset-themes/dist/blueprint/blueprint-${isVibrant ? 'vibrant' : 'normal'}.css`,
-          ),
-        ),
-      )
+      setRef(blueprintEl, fileUrl(require.resolve(`@blueprintjs/core/lib/css/blueprint.css`)))
     }
-    const blueprintIconEl = $('#blueprint-icon-css')
+    const blueprintIconEl = doc.querySelector('#blueprint-icon-css')
     if (blueprintIconEl) {
       setRef(
         blueprintIconEl,
         fileUrl(require.resolve('@blueprintjs/icons/lib/css/blueprint-icons.css')),
       )
     }
-    const normalizeEl = $('#normalize-css')
+    const normalizeEl = doc.querySelector('#normalize-css')
     if (normalizeEl) {
       setRef(normalizeEl, fileUrl(require.resolve('normalize.css/normalize.css')))
     }
+    updateBlueprintVibrantTokens(isVibrant)
     reloadCustomCss()
   }
 
@@ -187,7 +202,7 @@ export function loadStyle(
     const theme = config.get('poi.appearance.theme', 'dark')
     if ('darwin' === process.platform) {
       currentWindow.setBackgroundColor(value === 1 ? '#00000000' : '#000000')
-      currentWindow.setVibrancy(value === 1 ? 'window' : null)
+      currentWindow.setVibrancy('window')
     } else if ('win32' === process.platform) {
       if (currentWindow.isVisible()) {
         currentWindow.setBackgroundColor(value === 1 ? '#00000000' : '#000000')

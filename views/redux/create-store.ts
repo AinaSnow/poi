@@ -2,11 +2,17 @@ import type { ConfigInstance, ConfigStringPath, ConfigValue } from 'lib/config'
 import type { DeepKeyOf, DeepValueOf } from 'shims/utils'
 
 import * as remote from '@electron/remote'
+import ipc from 'lib/ipc'
 import { get, set, debounce, compact, cloneDeep, isEqual } from 'lodash'
 import { createStore, applyMiddleware, compose, type Store } from 'redux'
 import { observer, observe } from 'redux-observers'
-import thunk from 'redux-thunk'
+import { thunk } from 'redux-thunk'
+import { isMain } from 'views/env'
 
+import type { FcdState, FcdValue } from './fcd'
+
+import { createReplaceFCDAction, createWctfDbUpdateAction } from './actions/app'
+import { createInitIPCAction } from './actions/ipc'
 import { dispatchBattleResult } from './battle'
 import { saveQuestTracking, schedualDailyRefresh } from './info/quests'
 import { dockingCompleteObserver } from './info/repairs'
@@ -14,7 +20,7 @@ import { equipsCrossSliceMiddleware } from './middlewares/equips-cross-slice'
 import { questsCrossSliceMiddleware } from './middlewares/quests-cross-slice'
 import { resourcesCrossSliceMiddleware } from './middlewares/resources-cross-slice'
 import { shipsCrossSliceMiddleware } from './middlewares/ships-cross-slice'
-import { reducerFactory, onConfigChange, type RootState } from './reducer-factory'
+import { reducerFactory, onConfigChange, type RootState, onConfigDelete } from './reducer-factory'
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null
@@ -36,7 +42,7 @@ const storeCache: Record<string, unknown> = (function () {
 //### Utils ###
 
 const setLocalStorage = (): void => {
-  if (!window.isMain) {
+  if (!isMain) {
     return
   }
   process.nextTick(() => {
@@ -57,7 +63,7 @@ function autoCacheObserver(store: Store<RootState>, path: string) {
 }
 
 remote.getCurrentWindow().on('close', () => {
-  if (window.isMain) {
+  if (isMain) {
     localStorage.setItem(cachePosition, JSON.stringify(storeCache))
   }
 })
@@ -66,7 +72,6 @@ remote.getCurrentWindow().on('close', () => {
 
 declare global {
   interface Window {
-    dbg?: { isEnabled?: () => boolean }
     __REDUX_DEVTOOLS_EXTENSION_COMPOSE__?: typeof compose
   }
 }
@@ -74,8 +79,6 @@ declare global {
 const composeEnhancers =
   (window.dbg?.isEnabled() && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__) || compose
 
-// @ts-expect-error TS2589: Redux PreloadedState<RootState> recurses into DOM types via
-// LayoutState.webview.ref (ExtendedWebviewTag extends HTMLElement); pre-existing issue.
 export const store: Store<RootState> = createStore(
   reducerFactory(),
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -99,8 +102,6 @@ export function getStore<const Path extends DeepKeyOf<RootState>>(
 export function getStore(path?: string): unknown {
   // cache and lock are used by the custom combineReducers polyfill
   if (getStore.lock) {
-    // eslint-disable-next-line no-console
-    console.warn(new Error('You should not call getStore() in reducer.'))
     const cached = getStore.cache
     const storeContent = isRecord(cached) ? cached : {}
     return path !== undefined ? get(storeContent, path) : storeContent
@@ -125,15 +126,19 @@ const solveConfSet = <P extends ConfigStringPath>(path: P, value: ConfigValue<P>
   }
   store.dispatch(onConfigChange(details))
 }
+const solveConfDelete = <P extends ConfigStringPath>(path: P): void => {
+  store.dispatch(onConfigDelete({ path }))
+}
 const remoteConfig: ConfigInstance = remote.require('./lib/config')
 remoteConfig.addListener('config.set', solveConfSet)
+remoteConfig.addListener('config.delete', solveConfDelete)
 window.addEventListener('unload', () => {
   remoteConfig.removeListener('config.set', solveConfSet)
+  remoteConfig.removeListener('config.delete', solveConfDelete)
 })
 
-const ipc = remote.require('./lib/ipc')
-if (!window.isMain) {
-  store.dispatch({ type: '@@initIPC', content: ipc.list() })
+if (!isMain) {
+  store.dispatch(createInitIPCAction(ipc.list()))
 }
 ipc.on('update', (action: { type: string }) => store.dispatch(action))
 
@@ -141,10 +146,10 @@ observe(
   store,
   compact([
     // When any targetPath is modified, store it into localStorage
-    ...(window.isMain ? targetPaths.map((path) => autoCacheObserver(store, path)) : []),
+    ...(isMain ? targetPaths.map((path) => autoCacheObserver(store, path)) : []),
 
     // Save quest tracking to the file when it changes
-    window.isMain &&
+    isMain &&
       observer(
         (state: RootState) => state.info.quests.records,
         (_dispatch, current) => {
@@ -167,34 +172,30 @@ observe(
 )
 
 // publish data changes to plugin windows
-if (!window.isMain) {
+if (!isMain) {
   window.addEventListener('storage', (e: StorageEvent) => {
     if (e.key === '_storeCache' && e.newValue) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const { fcd, wctf = {} } = JSON.parse(e.newValue) as {
-        fcd: Record<string, unknown>
+        fcd: FcdState
         wctf?: { lastModified?: unknown; version?: string }
       }
-      for (const key of Object.keys(fcd)) {
-        if (!isEqual(fcd[key], get(getStore('fcd'), key))) {
+      let key: keyof FcdState
+      for (key in fcd) {
+        if (fcd[key] && !isEqual(fcd[key], get(getStore('fcd'), key))) {
           // eslint-disable-next-line no-console
           console.log(`Update ${key} from localStorage`)
-          store.dispatch({
-            type: '@@replaceFCD',
-            value: {
-              path: key,
-              data: fcd[key],
-            },
-          })
+          const payload: FcdValue<typeof key> = {
+            path: key,
+            data: fcd[key],
+          }
+          store.dispatch(createReplaceFCDAction(payload))
         }
       }
       if (wctf.lastModified && wctf.lastModified !== getStore('wctf').lastModified) {
         // eslint-disable-next-line no-console
         console.log(`Update wctf-db to ${wctf.version} from localstorage`)
-        store.dispatch({
-          type: '@@wctf-db-update',
-          payload: wctf,
-        })
+        store.dispatch(createWctfDbUpdateAction(wctf))
       }
     }
   })

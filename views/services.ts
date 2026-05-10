@@ -1,12 +1,14 @@
+import type { default as WindowManager } from 'lib/window'
 import type { Dispatch } from 'redux'
 
 import * as remote from '@electron/remote'
 import { observer, observe } from 'redux-observers'
 import { store, getStore, dispatch } from 'views/create-store'
-import { config } from 'views/env-parts/config'
+import { config } from 'views/env'
 import { dbg } from 'views/env-parts/dbg'
 import i18next from 'views/env-parts/i18next'
 import { toggleModal } from 'views/env-parts/modal'
+import { log, error } from 'views/services/alert'
 import { isInGame } from 'views/utils/game-utils'
 
 const gameAPIBroadcaster: GameAPIBroadcaster = remote.require('./lib/game-api-broadcaster')
@@ -23,6 +25,7 @@ import './services/sortie-unused-slot-check'
 import './services/event-sortie-check'
 import './services/google-analytics'
 import './services/battle-notify'
+import './services/window-pin'
 import type { GameAPIBroadcaster } from 'lib/game-api-broadcaster'
 
 import { isEqual } from 'lodash'
@@ -90,8 +93,9 @@ window.addEventListener('keydown', async (e) => {
 let confirmExit = false
 const exitPoi = () => {
   confirmExit = true
-  remote.require('./lib/window').rememberMain()
-  remote.require('./lib/window').closeWindows()
+  const { closeWindows, rememberMain }: typeof WindowManager = remote.require('./lib/window')
+  rememberMain()
+  closeWindows()
   window.onbeforeunload = null
   window.close()
 }
