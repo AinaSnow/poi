@@ -67,8 +67,8 @@ const PoiAppContainer = styled.div<{ overlay?: boolean; isDarkTheme?: boolean }>
   ${({ overlay, isDarkTheme }) =>
     overlay &&
     css`
-      backdrop-filter: blur(5px);
-      background: ${isDarkTheme ? 'rgb(32 43 51 / 0.9)' : 'rgb(245 248 250 / 0.9)'};
+      backdrop-filter: blur(30px);
+      background: oklch(from var(--poi-background-color) l c h / ${isDarkTheme ? '0.6' : '0.4'});
     `}
 `
 
@@ -86,7 +86,7 @@ const OverlayPanelTrigger = styled.a<{ isDarkTheme?: boolean }>`
   bottom: 0;
   border-top-left-radius: 5px;
   ${({ isDarkTheme }) => css`
-    background: ${isDarkTheme ? 'rgb(32 43 51 / 0.9)' : 'rgb(245 248 250 / 0.9)'};
+    background: oklch(from var(--poi-background-color) l c h / ${isDarkTheme ? '0.6' : '0.4'});
   `}
 
   & > svg {

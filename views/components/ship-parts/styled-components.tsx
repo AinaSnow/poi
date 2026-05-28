@@ -8,6 +8,7 @@ export const ShipCard = styled(Card)`
   flex-direction: column;
   height: 100%;
   padding: 2px;
+  overflow: hidden;
 `
 
 export const ShipWrapper = styled.div`
@@ -18,7 +19,7 @@ export const ShipWrapper = styled.div`
 
 export const ShipTabContainer = styled.div`
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
 `
 
 export const ShipTabContent = styled.div`
@@ -27,7 +28,7 @@ export const ShipTabContent = styled.div`
   height: 100%;
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 `
 
 export const ShipDeck = styled.div<{
@@ -45,7 +46,7 @@ export const ShipDeck = styled.div<{
   ${({ transition }) =>
     transition &&
     css`
-      transition: all 0.3s 0.2s cubic-bezier(1, 0, 0, 1);
+      transition: transform 0.3s 0.2s cubic-bezier(1, 0, 0, 1);
     `}
   ${({ left, right }) =>
     left
@@ -59,7 +60,7 @@ export const ShipDeck = styled.div<{
   ${({ active }) =>
     !active &&
     css`
-      & > * {
+      & > div {
         display: none;
       }
     `}
@@ -68,6 +69,8 @@ export const ShipDeck = styled.div<{
 export const ShipDetails = styled(ScrollShadow)`
   overflow: scroll;
   flex: 1;
+  margin: 0 -2px -2px;
+  padding: 0 2px 2px;
 `
 
 export const FleetNameButtonContainer = styled.div`

@@ -2,7 +2,7 @@ import type { RootState } from 'views/redux/reducer-factory'
 
 import { Button, ResizeSensor } from '@blueprintjs/core'
 import { memoize } from 'lodash'
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { createSelector } from 'reselect'
 import { styled } from 'styled-components'
@@ -40,6 +40,8 @@ const CardWrapper = styled(CardWrapperL)`
   flex-direction: column;
 `
 
+const FLEET_INDICES = [0, 1, 2, 3] as const
+
 const shipViewSwitchButtonDataSelectorFactory = memoize((fleetId: number) =>
   createSelector([fleetStateSelectorFactory(fleetId)], (fleetState) => ({ fleetState })),
 )
@@ -69,37 +71,29 @@ const ShipViewSwitchButton = ({
   )
 }
 
-interface MiniShipProps {
-  airBaseCnt: number
-  enableTransition: boolean
-  fleetCount: number
-  activeFleetId: number
-  editable?: boolean
-  dispatch: ReturnType<typeof useDispatch>
-}
+export const MiniShip = ({ editable }: { editable?: boolean }) => {
+  const dispatch = useDispatch()
+  const airBaseCnt = useSelector((state: RootState) => state.info?.airbase?.length ?? 0)
+  const enableTransition = useSelector(
+    (state: RootState) => state.config?.poi?.transition?.enable ?? true,
+  )
+  const fleetCount = useSelector((state: RootState) => state.info?.fleets?.length ?? 4)
+  const activeFleetId = useSelector((state: RootState) => state.ui?.activeFleetId ?? 0)
 
-const MiniShipInner = ({
-  airBaseCnt,
-  enableTransition,
-  fleetCount,
-  activeFleetId: activeFleetIdProp,
-  editable,
-  dispatch,
-}: MiniShipProps) => {
-  const [prevPropFleetId, setPrevPropFleetId] = useState(activeFleetIdProp)
-  const [activeFleetId, setActiveFleetId] = useState(activeFleetIdProp)
   const [prevFleetId, setPrevFleetId] = useState<number | null>(null)
 
-  if (activeFleetIdProp !== prevPropFleetId) {
-    setPrevPropFleetId(activeFleetIdProp)
-    setPrevFleetId(activeFleetId)
-    setActiveFleetId(activeFleetIdProp)
-  }
+  useLayoutEffect(() => {
+    return () => {
+      setPrevFleetId(activeFleetId)
+    }
+  }, [activeFleetId])
 
-  const handleTransitionEnd = useCallback(
-    (i: number) => setPrevFleetId((prev) => (i === prev ? null : prev)),
-    [],
-  )
+  const handleTransitionEnd = (i: number) =>
+    requestAnimationFrame(() => {
+      if (i === prevFleetId) {
+        setPrevFleetId(null)
+      }
+    })
 
   const handleClick = useCallback(
     (idx: number) => {
@@ -139,7 +133,7 @@ const MiniShipInner = ({
     >
       <FleetNameButtonContainer className="miniship-switch">
         <FleetNameButton className="miniship-fleet-switch">
-          {[0, 1, 2, 3].map((i) => (
+          {FLEET_INDICES.map((i) => (
             <ShipViewSwitchButton
               key={i}
               fleetId={i}
@@ -160,7 +154,7 @@ const MiniShipInner = ({
       </FleetNameButtonContainer>
       <ResizeSensor onResize={handleResize}>
         <ShipTabContent className="miniship-fleet-content">
-          {[0, 1, 2, 3].map((i) => (
+          {FLEET_INDICES.map((i) => (
             <ShipDeck
               className="ship-deck"
               onTransitionEnd={() => handleTransitionEnd(i)}
@@ -187,25 +181,5 @@ const MiniShipInner = ({
         </ShipTabContent>
       </ResizeSensor>
     </CardWrapper>
-  )
-}
-
-export const MiniShip = ({ editable }: { editable?: boolean }) => {
-  const dispatch = useDispatch()
-  const airBaseCnt = useSelector((state: RootState) => state.info?.airbase?.length ?? 0)
-  const enableTransition = useSelector(
-    (state: RootState) => state.config?.poi?.transition?.enable ?? true,
-  )
-  const fleetCount = useSelector((state: RootState) => state.info?.fleets?.length ?? 4)
-  const activeFleetId = useSelector((state: RootState) => state.ui?.activeFleetId ?? 0)
-  return (
-    <MiniShipInner
-      airBaseCnt={airBaseCnt}
-      enableTransition={enableTransition}
-      fleetCount={fleetCount}
-      activeFleetId={activeFleetId}
-      editable={editable}
-      dispatch={dispatch}
-    />
   )
 }

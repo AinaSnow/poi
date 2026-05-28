@@ -1,10 +1,7 @@
-import type { TFunction } from 'i18next'
-import type { APIShip } from 'kcsapi/api_port/port/response'
-import type { APIMstShip } from 'kcsapi/api_start2/getData/response'
 import type { RootState } from 'views/redux/reducer-factory'
 
 import { Tag, ProgressBar, Intent, Position, Tooltip } from '@blueprintjs/core'
-import { isEqual, pick, omit, memoize, get } from 'lodash'
+import { memoize, get } from 'lodash'
 import path from 'path'
 import React, { memo } from 'react'
 import FontAwesome from 'react-fontawesome'
@@ -185,17 +182,6 @@ const miniShipRowDataSelectorFactory = memoize((shipId: number) =>
   ),
 )
 
-const SHIP_PROPS_TO_PICK = [
-  'api_lv',
-  'api_exp',
-  'api_id',
-  'api_nowhp',
-  'api_maxhp',
-  'api_cond',
-  'api_slot',
-  'api_slot_ex',
-] as const
-
 const ShipTooltip = styled.div`
   font-size: 13px;
   white-space: nowrap;
@@ -263,7 +249,7 @@ const ShipName = styled.div<{ avatar?: boolean }>`
       padding-right: 6px;
       font-weight: 600;
       color: white;
-      text-shadow: #000 0 0 10px;
+      text-shadow: #000 0 0 3px;
     `}
 `
 
@@ -281,7 +267,7 @@ const ShipLvText = styled.div<{ avatar?: boolean }>`
       text-align: end;
       padding-right: 6px;
       color: white;
-      text-shadow: #000 0 0 10px;
+      text-shadow: #000 0 0 3px;
     `}
 `
 
@@ -348,6 +334,7 @@ const ShipTile = styled.div`
   justify-content: space-between;
   margin: 4px 0;
   position: relative;
+  width: 100%;
 
   .ship-item-wrapper {
     width: 100%;
@@ -362,26 +349,21 @@ const ShipTile = styled.div`
   }
 `
 
-interface MiniShipRowInnerProps {
-  ship?: APIShip
-  $ship?: APIMstShip
-  labelStatus: number
-  shipAvatarColor: string
-  enableAvatar?: boolean
-  compact?: boolean
-  t: TFunction
-}
-
-const MiniShipRowInner = memo(
+export const MiniShipRow = memo(
   ({
-    ship,
-    $ship,
-    labelStatus,
+    shipId,
     enableAvatar,
-    shipAvatarColor,
     compact,
-    t,
-  }: MiniShipRowInnerProps) => {
+  }: {
+    shipId: number
+    enableAvatar?: boolean
+    compact?: boolean
+  }) => {
+    const { t } = useTranslation(['resources', 'main'])
+    const selector = React.useMemo(() => miniShipRowDataSelectorFactory(shipId), [shipId])
+    const { ship, $ship, labelStatus, shipAvatarColor } = useSelector((state: RootState) =>
+      selector(state),
+    )
     const hideShipName = enableAvatar && compact
     if (!ship || !ship.api_id) return <div />
     const labelStatusStyle = getStatusStyle(labelStatus)
@@ -410,6 +392,7 @@ const MiniShipRowInner = memo(
             <Slotitems shipId={ship.api_id as number} />
           </ShipTooltip>
         }
+        fill
       >
         <ShipItem
           className="ship-item"
@@ -500,26 +483,8 @@ const MiniShipRowInner = memo(
       </ShipTile>
     )
   },
-  (prev, next) =>
-    isEqual(omit(prev, ['ship']), omit(next, ['ship'])) &&
-    isEqual(pick(prev.ship, SHIP_PROPS_TO_PICK), pick(next.ship, SHIP_PROPS_TO_PICK)),
 )
-MiniShipRowInner.displayName = 'MiniShipRowInner'
-
-export const MiniShipRow = ({
-  shipId,
-  enableAvatar,
-  compact,
-}: {
-  shipId: number
-  enableAvatar?: boolean
-  compact?: boolean
-}) => {
-  const { t } = useTranslation(['resources', 'main'])
-  const selector = React.useMemo(() => miniShipRowDataSelectorFactory(shipId), [shipId])
-  const data = useSelector((state: RootState) => selector(state))
-  return <MiniShipRowInner {...data} enableAvatar={enableAvatar} compact={compact} t={t} />
-}
+MiniShipRow.displayName = 'MiniShipRow'
 
 const LandBaseStatTag = styled(Tag)`
   grid-column: 3 / 4;
@@ -549,7 +514,7 @@ const ShipFP = styled.div<{ avatar?: boolean }>`
       text-align: end;
       padding-right: 6px;
       color: white;
-      text-shadow: #000 0 0 10px;
+      text-shadow: #000 0 0 3px;
     `}
 `
 

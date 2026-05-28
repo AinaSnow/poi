@@ -1,3 +1,17 @@
+:root {
+  --poi-background-color: rgb(246 247 249);
+  --poi-background-color-opaque: rgb(246 247 249);
+}
+
+.bp6-dark {
+  --poi-background-color: rgb(47 52 60);
+  --poi-background-color-opaque: rgb(47 52 60);
+}
+
+body {
+  background-color: var(--poi-background-color);
+}
+
 .poi {
   display: flex;
   flex-direction: column;
@@ -30,24 +44,9 @@ poi-main {
   position: relative;
 }
 
-.bp6-popover-content,
-.bp6-dialog {
-  backdrop-filter: blur(5px);
-}
-
 .bp6-tooltip .bp6-popover-content {
   max-width: calc(50vw - 20px);
   overflow: hidden;
-}
-
-.plugin-dropdown-container,
-.plugin-dropdown-container .bp6-popover-content {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-
-.plugin-dropdown-container > .bp6-popover-content > .bp6-menu {
-  background: transparent;
 }
 
 .bp6-html-select select,
@@ -79,6 +78,8 @@ poi-main {
 
 #electron-app-title-bar img.icon {
   margin: 6px 10px !important;
+  height: 18px !important;
+  width: 18px !important;
 }
 
 body:not(.bp6-dark) #electron-app-title-bar .window-controls button:not(:hover),

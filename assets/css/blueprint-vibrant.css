@@ -3,6 +3,7 @@
   --bp-surface-background-color-default-hover: rgb(246 247 249 / 0.6);
   --bp-surface-background-color-default-active: rgb(237 239 242 / 0.6);
   --bp-surface-background-color-default-disabled: rgb(255 255 255 / 0.6);
+  --poi-background-color: rgb(246 247 249 / 0.25) !important;
 }
 
 .bp6-dark {
@@ -10,6 +11,17 @@
   --bp-surface-background-color-default-hover: rgb(28 33 39 / 0.6);
   --bp-surface-background-color-default-active: rgb(37 42 49 / 0.6);
   --bp-surface-background-color-default-disabled: rgb(17 20 24 / 0.6);
+  --poi-background-color: rgb(47 52 60 / 0.5) !important;
+}
+
+body.darwin {
+  background-color: transparent !important;
+
+  --poi-background-color: rgb(255 255 255 / 0.1) !important;
+}
+
+body.darwin.bp6-dark {
+  --poi-background-color: rgb(24 24 24 / 0.1) !important;
 }
 
 .bp6-button:not([class*="bp6-intent-"], [class*="bp6-minimal"]) {
@@ -42,11 +54,27 @@
   background-color: var(--bp-surface-background-color-default-rest) !important;
 }
 
-.bp6-popover:not(.bp6-dark, .bp6-tooltip) .bp6-popover-content {
-  background-color: oklch(from #fff l c h / calc(alpha - 0.15));
+.bp6-popover:not(.bp6-tooltip) .bp6-popover-arrow::before,
+.bp6-dialog,
+.bp6-popover:not(.bp6-tooltip) .bp6-popover-content {
+  backdrop-filter: url("../svg/ui/filter.svg#blur") !important;
+  will-change: backdrop-filter;
+  text-rendering: geometricprecision;
 }
 
-.bp6-popover.bp6-dark:not(.bp6-tooltip) .bp6-popover-content,
-.bp6-dark .bp6-popover:not(.bp6-tooltip) .bp6-popover-content {
-  background-color: oklch(from #2f343c l c h / calc(alpha - 0.15));
+.bp6-popover-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.bp6-popover:not(.bp6-tooltip) .bp6-popover-arrow-fill {
+  fill: var(--bp-surface-background-color-default-rest) !important;
+}
+
+.bp6-popover:not(.bp6-tooltip) .bp6-popover-content {
+  background-color: var(--bp-surface-background-color-default-rest) !important;
 }

@@ -2,7 +2,7 @@ import type { APIMstMapinfo } from 'kcsapi/api_start2/getData/response'
 import type { MapInfo } from 'views/redux/info/maps'
 import type { RootState } from 'views/redux/reducer-factory'
 
-import { ProgressBar, Position, PopoverInteractionKind, Intent, Button } from '@blueprintjs/core'
+import { ProgressBar, PopoverInteractionKind, Intent, Button, PopoverNext } from '@blueprintjs/core'
 import classNames from 'classnames'
 import { map, zip, each } from 'lodash'
 import { rgba } from 'polished'
@@ -14,7 +14,6 @@ import { css, keyframes, styled } from 'styled-components'
 import { Avatar } from 'views/components/etc/avatar'
 import { CustomTag } from 'views/components/etc/custom-tag'
 import { MaterialIcon } from 'views/components/etc/icon'
-import { Popover } from 'views/components/etc/overlay'
 import { config } from 'views/env'
 import {
   sortieMapDataSelector,
@@ -90,9 +89,9 @@ const MapRoutesSVG = styled.svg<{ theme?: { BLUE5?: string; vibrant?: string } }
 `
 
 const MaproutesBlink = keyframes`
-  from { fill: #d50000; }
-  50% { fill: #ff9800; }
-  to { fill: #d50000; }
+  from { opacity: 1; }
+  50% { opacity: 0.35; }
+  to { opacity: 1; }
 `
 
 const Point = styled.rect<{ active?: boolean; passed?: boolean; boss?: boolean }>`
@@ -100,6 +99,7 @@ const Point = styled.rect<{ active?: boolean; passed?: boolean; boss?: boolean }
   ${({ active }) =>
     active &&
     css`
+      fill: #d50000;
       animation: ${MaproutesBlink} 1s linear infinite;
     `}
   ${({ passed }) =>
@@ -300,9 +300,7 @@ const mapReminderSelector = createSelector(
   }),
 )
 
-export const PoiMapReminder = () => <PoiMapReminderInner />
-
-const PoiMapReminderInner = () => {
+export const PoiMapReminder = () => {
   const { t } = useTranslation()
   const { mapHp, mapData, nextEnemy, currentNode, mapId, maps, pinminimap } = useSelector(
     (state: RootState) => mapReminderSelector(state),
@@ -330,15 +328,16 @@ const PoiMapReminderInner = () => {
 
   return (
     <PoiMapReminderTag tag="poi-map-reminder">
-      <Popover
-        position={Position.TOP_RIGHT}
+      <PopoverNext
+        placement="top-end"
         portalClassName={classNames('map-reminder-popover', {
           pinned: !!mapData && pinminimap,
         })}
         disabled={!mapData}
-        modifiers={{
+        middleware={{
           offset: {
-            options: { offset: [-5, 15] },
+            mainAxis: 12,
+            crossAxis: -10,
           },
         }}
         content={
@@ -402,7 +401,7 @@ const PoiMapReminderInner = () => {
             </span>
           </Alert>
         </MapReminder>
-      </Popover>
+      </PopoverNext>
     </PoiMapReminderTag>
   )
 }

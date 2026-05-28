@@ -220,10 +220,11 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
           const { stopFileNavigate }: typeof WebContentUtils =
             remote.require('./lib/webcontent-utils')
           stopFileNavigate(currentWindow?.webContents.id ?? -1)
-          externalWindowRef.current.addEventListener('beforeunload', () => {
-            setLoaded(false)
-            const bounds = currentWindowRef.current?.getBounds()
-            config.set(`plugin.${plugin.id}.bounds`, bounds)
+          currentWindowRef.current?.once('close', () => {
+            if (currentWindowRef.current && !currentWindowRef.current.isDestroyed()) {
+              const bounds = currentWindowRef.current.getBounds()
+              config.set(`plugin.${plugin.id}.bounds`, bounds)
+            }
             try {
               closeWindowPortal()
             } catch (e) {
@@ -249,8 +250,11 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
         try {
           if (externalWindowRef.current) {
             externalWindowRef.current.onbeforeunload = null
-            currentWindowRef.current?.setClosable(true)
-            externalWindowRef.current.close()
+            const win = currentWindowRef.current
+            if (win && !win.isDestroyed()) {
+              win.setClosable(true)
+              externalWindowRef.current.close()
+            }
           }
         } catch (e) {
           console.error(e)
@@ -259,7 +263,13 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    if (!loaded || !externalWindowRef.current || !checkBrowserWindowExistence()) return null
+    if (
+      !loaded ||
+      !externalWindowRef.current ||
+      externalWindowRef.current.closed ||
+      !checkBrowserWindowExistence()
+    )
+      return null
 
     const mountPoint = externalWindowRef.current.document.querySelector('#plugin-mountpoint')
     if (!mountPoint) return null
@@ -280,7 +290,7 @@ ${stylesheetTagsWithID}${stylesheetTagsWithHref}`
           <StyleSheetManager target={externalWindowRef.current.document.head}>
             {showCustomTitleBar && currentWindowRef.current ? (
               <TitleBar
-                icon={join(ROOT, 'assets', 'icons', 'poi_32x32.png')}
+                icon={join(ROOT, 'assets', 'icons', 'poi_monochrome.svg')}
                 browserWindowId={currentWindowRef.current.id}
                 {...(pinned
                   ? {

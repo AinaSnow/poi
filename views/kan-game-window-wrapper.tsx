@@ -328,9 +328,15 @@ const KanGameWindowWrapperInner = ({ titleExtra, pinned, windowRefsRef }: InnerP
       stopFileNavigate(curWindow!.webContents.id)
       handleWebviewPreloadHack(curWindow!.webContents.id)
 
-      extWindow?.addEventListener('beforeunload', () => {
-        const bounds = curWindow?.getBounds()
-        config.set('poi.kangameWindow.bounds', bounds)
+      curWindow?.once('close', () => {
+        try {
+          if (curWindow && !curWindow.isDestroyed()) {
+            const bounds = curWindow.getBounds()
+            config.set('poi.kangameWindow.bounds', bounds)
+          }
+        } catch (e) {
+          console.error(e)
+        }
       })
 
       if (initialWindowUseFixedResolution) {
@@ -398,6 +404,16 @@ const KanGameWindowWrapperInner = ({ titleExtra, pinned, windowRefsRef }: InnerP
   // eslint-disable-next-line react-hooks/refs
   if (!loaded || !externalWindowRef.current || !checkBrowserWindowExistence()) return null
 
+  // eslint-disable-next-line react-hooks/refs
+  let mountPoint: Element | null
+  try {
+    // eslint-disable-next-line react-hooks/refs
+    mountPoint = externalWindowRef.current.document.querySelector('#plugin-mountpoint')
+  } catch (_e) {
+    return null
+  }
+  if (!mountPoint) return null
+
   return ReactDOM.createPortal(
     <BlueprintProvider portalContainer={containerEl}>
       <StyleSheetManager
@@ -406,7 +422,7 @@ const KanGameWindowWrapperInner = ({ titleExtra, pinned, windowRefsRef }: InnerP
       >
         {customTitlebar ? (
           <TitleBar
-            icon={join(ROOT, 'assets', 'icons', 'poi_32x32.png')}
+            icon={join(ROOT, 'assets', 'icons', 'poi_monochrome.svg')}
             // eslint-disable-next-line react-hooks/refs
             browserWindowId={currentWindowRef.current!.id}
             disableClose
@@ -423,8 +439,7 @@ const KanGameWindowWrapperInner = ({ titleExtra, pinned, windowRefsRef }: InnerP
         </PoiAppTabpane>
       </StyleSheetManager>
     </BlueprintProvider>,
-    // eslint-disable-next-line react-hooks/refs
-    externalWindowRef.current.document.querySelector('#plugin-mountpoint')!,
+    mountPoint,
   )
 }
 

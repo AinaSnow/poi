@@ -1,8 +1,8 @@
 import type { RootState } from 'views/redux/reducer-factory'
 
 import { ResizeSensor } from '@blueprintjs/core'
-import { isEqual, range } from 'lodash'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { isEqual, range, debounce } from 'lodash'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { css, styled } from 'styled-components'
 import { MaterialIcon } from 'views/components/etc/icon'
@@ -70,7 +70,7 @@ const AdditionalValue = styled.div<{ inc?: boolean; dec?: boolean }>`
   color: white;
   opacity: 0;
   text-align: right;
-  transition: all 0.3s;
+  transition: opacity 0.3s;
   z-index: 1;
   min-width: 4em;
   ${({ inc, dec }) =>
@@ -95,13 +95,11 @@ const getPanelDimension = (width: number): number => {
   return 2
 }
 
-interface ResourcePanelInnerProps {
-  resources: number[]
-  admiralLv: number
-  editable?: boolean
-}
-
-const ResourcePanelInner = ({ resources, admiralLv, editable }: ResourcePanelInnerProps) => {
+export const ResourcePanel = ({ editable }: { editable?: boolean }) => {
+  const resources = useSelector(
+    (state: RootState) => state?.info?.resources ?? [0, 0, 0, 0, 0, 0, 0, 0],
+  )
+  const admiralLv = useSelector((state: RootState) => state?.info?.basic?.api_level ?? 0)
   const animTimeStamp = useRef([0, 0, 0, 0, 0, 0, 0, 0])
   const [resourceIncrement, setResourceIncrement] = useState([0, 0, 0, 0, 0, 0, 0, 0])
   const [dimension, setDimension] = useState(2)
@@ -141,10 +139,18 @@ const ResourcePanelInner = ({ resources, admiralLv, editable }: ResourcePanelInn
     })
   }, [resources])
 
-  const handleResize = useCallback((entries: ResizeObserverEntry[]) => {
-    const dim = getPanelDimension(entries[0].contentRect.width)
-    setDimension((prev) => (dim !== prev ? dim : prev))
-  }, [])
+  const handleResize = useMemo(
+    () =>
+      debounce((entries: ResizeObserverEntry[]) => {
+        const dim = getPanelDimension(entries[0].contentRect.width)
+        setDimension((prev) => (dim !== prev ? dim : prev))
+      }, 50),
+    [],
+  )
+
+  useEffect(() => {
+    return () => handleResize.cancel()
+  }, [handleResize])
 
   const valid = !!admiralLv
   const limit = 750 + admiralLv * 250
@@ -176,12 +182,4 @@ const ResourcePanelInner = ({ resources, admiralLv, editable }: ResourcePanelInn
       </CardWrapper>
     </ResizeSensor>
   )
-}
-
-export const ResourcePanel = ({ editable }: { editable?: boolean }) => {
-  const resources = useSelector(
-    (state: RootState) => state?.info?.resources ?? [0, 0, 0, 0, 0, 0, 0, 0],
-  )
-  const admiralLv = useSelector((state: RootState) => state?.info?.basic?.api_level ?? 0)
-  return <ResourcePanelInner resources={resources} admiralLv={admiralLv} editable={editable} />
 }

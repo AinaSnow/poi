@@ -5,9 +5,10 @@ import { Tag, Intent, ResizeSensor, Tooltip } from '@blueprintjs/core'
 import { map, range, forEach, values, sortBy } from 'lodash'
 import React, { useCallback, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { createSelector } from 'reselect'
 import { css, styled } from 'styled-components'
+import ScrollShadow from 'views/components/etc/scroll-shadow'
 import { config } from 'views/env'
 import i18next from 'views/env-parts/i18next'
 import {
@@ -125,7 +126,15 @@ function getToolTip(record: QuestRecord): string[] {
 
 const CardWrapper = styled(CardWrapperL)`
   display: flex;
-  flex-flow: row wrap;
+  flex-direction: column;
+  overflow: hidden;
+`
+
+const ScollShadowWrapper = styled(ScrollShadow)`
+  margin: -5px -9px;
+  padding: 5px 9px;
+  flex: 1;
+  overflow: auto;
 `
 
 const TaskItem = styled.div<{ colwidth: number }>`
@@ -294,19 +303,10 @@ const TaskRow = ({ idx, quest, colwidth }: { idx: number; quest: Quest; colwidth
   )
 }
 
-interface TaskPanelInnerProps {
-  activeQuests: Record<string, { detail: Quest }>
-  activeCapacity: number
-  activeNum: number
-  editable?: boolean
-}
-
-const TaskPanelInner = ({
-  activeQuests,
-  activeCapacity,
-  activeNum,
-  editable,
-}: TaskPanelInnerProps) => {
+export const TaskPanel = ({ editable }: { editable?: boolean }) => {
+  const activeQuests = useSelector((state: RootState) => state.info?.quests?.activeQuests)
+  const activeCapacity = useSelector((state: RootState) => state.info?.quests?.activeCapacity ?? 0)
+  const activeNum = useSelector((state: RootState) => state.info?.quests?.activeNum ?? 0)
   const [dimension, setDimension] = useState(1)
 
   const handleResize = useCallback((entries: ResizeObserverEntry[]) => {
@@ -318,12 +318,14 @@ const TaskPanelInner = ({
   return (
     <ResizeSensor onResize={handleResize}>
       <CardWrapper className="task-card" elevation={editable ? 2 : 0} interactive={editable}>
-        <TaskPanelContent
-          activeQuests={activeQuests}
-          activeCapacity={activeCapacity}
-          activeNum={activeNum}
-          colwidth={colwidth}
-        />
+        <ScollShadowWrapper>
+          <TaskPanelContent
+            activeQuests={activeQuests}
+            activeCapacity={activeCapacity}
+            activeNum={activeNum}
+            colwidth={colwidth}
+          />
+        </ScollShadowWrapper>
       </CardWrapper>
     </ResizeSensor>
   )
@@ -368,21 +370,5 @@ const TaskPanelContent = ({
         ),
       )}
     </>
-  )
-}
-
-export const TaskPanel = ({ editable }: { editable?: boolean }) => {
-  void useDispatch()
-  const activeQuests = useSelector((state: RootState) => state.info?.quests?.activeQuests)
-  const activeCapacity = useSelector((state: RootState) => state.info?.quests?.activeCapacity ?? 0)
-  const activeNum = useSelector((state: RootState) => state.info?.quests?.activeNum ?? 0)
-
-  return (
-    <TaskPanelInner
-      activeQuests={activeQuests}
-      activeCapacity={activeCapacity}
-      activeNum={activeNum}
-      editable={editable}
-    />
   )
 }

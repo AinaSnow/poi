@@ -61,6 +61,7 @@ export function loadStyle(
   glass.style.backgroundRepeat = 'no-repeat'
   glass.style.backgroundPosition = 'center center'
   glass.style.backgroundSize = 'cover'
+  glass.style.backgroundColor = 'var(--poi-background-color)'
   glass.style.color = '#000'
   glass.style.display = 'none'
 
@@ -86,26 +87,26 @@ export function loadStyle(
   }
 
   const delaySetClassName = (className: string) => {
-    if (doc.body) {
-      doc.body.className = className
-    } else {
-      setTimeout(() => delaySetClassName(className), 100)
-    }
-  }
-
-  const delaySetBackgroundColor = (value: string) => {
-    if (doc.body) {
-      doc.body.style.backgroundColor = value
-    } else {
-      setTimeout(() => delaySetBackgroundColor(value), 100)
+    try {
+      if (doc.body) {
+        doc.body.className = className
+      } else {
+        setTimeout(() => delaySetClassName(className), 100)
+      }
+    } catch (_e) {
+      // Window may have been closed between the retry and execution
     }
   }
 
   const delaySetFilter = (value: string | null) => {
-    if (doc.body) {
-      doc.body.style.filter = value ?? ''
-    } else {
-      setTimeout(() => delaySetFilter(value), 100)
+    try {
+      if (doc.body) {
+        doc.body.style.filter = value ?? ''
+      } else {
+        setTimeout(() => delaySetFilter(value), 100)
+      }
+    } catch (_e) {
+      // Window may have been closed between the retry and execution
     }
   }
 
@@ -114,18 +115,6 @@ export function loadStyle(
       delaySetFilter(null)
     } else {
       delaySetFilter(`url(${fileUrl(join(ROOT, 'assets', 'svg', 'ui', 'filter.svg'))}#${type})`)
-    }
-  }
-
-  const setBackgroundColor = (isDark: boolean, isVibrant: boolean | number) => {
-    if (isVibrant) {
-      if ('darwin' === process.platform) {
-        delaySetBackgroundColor('transparent')
-      } else {
-        delaySetBackgroundColor(isDark ? 'rgba(47, 52, 60, 0.5)' : 'rgba(246, 247, 249, 0.25)')
-      }
-    } else {
-      delaySetBackgroundColor(isDark ? 'rgb(47, 52, 60)' : 'rgb(246, 247, 249)')
     }
   }
 
@@ -160,12 +149,11 @@ export function loadStyle(
     isVibrant = typeof isVibrant === 'boolean' ? isVibrant : config.get('poi.appearance.vibrant', 0)
     const isDark = theme === 'dark'
     window.isDarkTheme = isDark
-    setBackgroundColor(isDark, isVibrant)
-    glass.style.backgroundColor = isDark ? 'rgb(47, 52, 60)' : 'rgb(246, 247, 249)'
     setFilter(config.get('poi.appearance.colorblindFilter'))
     delaySetClassName(
       classNames('bp6-focus-disabled', {
         'bp6-dark': isDark,
+        darwin: process.platform === 'darwin',
       }),
     )
     const bootstrapEl = doc.querySelector('#bootstrap-css')
@@ -220,7 +208,11 @@ export function loadStyle(
   setVibrancy(config.get('poi.appearance.vibrant', 0))
 
   currentWindow.on('focus', () => {
-    setVibrancy(config.get('poi.appearance.vibrant', 0))
+    try {
+      setVibrancy(config.get('poi.appearance.vibrant', 0))
+    } catch (_e) {
+      // Window may have been closed
+    }
   })
 
   const themeChangeHandler = <P extends ConfigStringPath>(configPath: P, value: ConfigValue<P>) => {
@@ -256,7 +248,7 @@ export function loadStyle(
 
   const toggleBackground = (value: number) => {
     if (value === 2) {
-      div.style.filter = 'blur(10px) saturate(50%)'
+      div.style.filter = 'blur(30px) saturate(50%)'
       div.style.display = 'block'
       glass.style.display = 'block'
     } else {
@@ -267,12 +259,16 @@ export function loadStyle(
   }
 
   currentWindow.webContents.on('dom-ready', () => {
-    doc.body.appendChild(customCSS)
-    doc.head.appendChild(FACSS)
-    doc.body.appendChild(div)
-    doc.body.appendChild(glass)
-    setBackground(config.get('poi.appearance.background') ?? null)
-    toggleBackground(config.get('poi.appearance.vibrant', 0))
+    try {
+      doc.body.appendChild(customCSS)
+      doc.head.appendChild(FACSS)
+      doc.body.appendChild(div)
+      doc.body.appendChild(glass)
+      setBackground(config.get('poi.appearance.background') ?? null)
+      toggleBackground(config.get('poi.appearance.vibrant', 0))
+    } catch (_e) {
+      // Window may have been closed
+    }
   })
 
   void isMainWindow

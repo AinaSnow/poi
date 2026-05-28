@@ -5,12 +5,22 @@ import React, {
   Children,
   forwardRef,
   memo,
-  useCallback,
   useImperativeHandle,
+  useLayoutEffect,
   useState,
 } from 'react'
 import { useSelector } from 'react-redux'
-import { css, styled } from 'styled-components'
+import { css, keyframes, styled } from 'styled-components'
+
+const slideOutLeft = keyframes`
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-100%, 0, 0); }
+`
+
+const slideOutRight = keyframes`
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+`
 
 const PoiTabContents = styled.div`
   flex: 1 0 0;
@@ -19,10 +29,12 @@ const PoiTabContents = styled.div`
   display: flex;
   height: 100%;
   width: 100%;
+  contain: layout;
 `
 
 const PoiTabChildPositioner = styled.div<{
   transition?: boolean
+  animating?: boolean
   left?: boolean
   right?: boolean
   active?: boolean
@@ -34,27 +46,42 @@ const PoiTabChildPositioner = styled.div<{
   width: 100%;
   height: 100%;
   transform: translate3d(0, 0, 0);
-  ${({ transition }) =>
-    transition &&
-    css`
-      transition: transform 0.3s 0.1s cubic-bezier(1, 0, 0, 1);
-      will-change: transform;
-    `}
-  ${({ left, right }) =>
-    left
+  ${({ transition, animating, left, right }) =>
+    transition && animating
+      ? left
+        ? css`
+            animation: ${slideOutLeft} 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            will-change: transform;
+          `
+        : right &&
+          css`
+            animation: ${slideOutRight} 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            will-change: transform;
+          `
+      : transition &&
+        css`
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: transform;
+        `}
+  ${({ left, right, animating }) =>
+    animating
       ? css`
-          transform: translate3d(-100%, 0, 0);
           pointer-events: none;
         `
-      : right &&
-        css`
-          transform: translate3d(100%, 0, 0);
-          pointer-events: none;
-        `}
+      : left
+        ? css`
+            transform: translate3d(-100%, 0, 0);
+            pointer-events: none;
+          `
+        : right &&
+          css`
+            transform: translate3d(100%, 0, 0);
+            pointer-events: none;
+          `}
   ${({ active }) =>
     !active &&
     css`
-      & > * {
+      & > div {
         display: none !important;
       }
     `}
@@ -90,20 +117,19 @@ const TabContentsUnionInner = forwardRef<TabContentsUnionHandle, Props>(
       (state: RootState): boolean => state.config?.poi?.transition?.enable ?? true,
     )
 
-    const [internalActiveTab, setInternalActiveTab] = useState(activeTab)
     const [prevTab, setPrevTab] = useState<string | null>(null)
 
-    if (activeTab !== internalActiveTab) {
-      setPrevTab(internalActiveTab)
-      setInternalActiveTab(activeTab)
-    }
+    useLayoutEffect(() => {
+      return () => {
+        setPrevTab(activeTab)
+      }
+    }, [activeTab])
 
-    const handleTransitionEnd = useCallback(
-      (key: string) => {
+    const handleAnimationEnd = (key: string) => {
+      requestAnimationFrame(() => {
         if (prevTab === key) setPrevTab(null)
-      },
-      [prevTab],
-    )
+      })
+    }
 
     useImperativeHandle(
       ref,
@@ -115,7 +141,7 @@ const TabContentsUnionInner = forwardRef<TabContentsUnionHandle, Props>(
     )
 
     const activeKey =
-      internalActiveTab || (React.isValidElement(children) ? String(children.key ?? '') : '')
+      activeTab || (React.isValidElement(children) ? String(children.key ?? '') : '')
 
     let onTheLeft = true
     const content: React.ReactNode[] = []
@@ -128,10 +154,11 @@ const TabContentsUnionInner = forwardRef<TabContentsUnionHandle, Props>(
           key={key}
           className="poi-tab-child-positioner"
           transition={(key === activeKey || key === prevTab) && enableTransition}
+          animating={key === prevTab && enableTransition}
           active={key === activeKey || key === prevTab}
           left={key !== activeKey && onTheLeft}
           right={key !== activeKey && !onTheLeft}
-          onTransitionEnd={() => handleTransitionEnd(key)}
+          onAnimationEnd={() => handleAnimationEnd(key)}
         >
           {child}
         </PoiTabChildPositioner>,

@@ -1,5 +1,5 @@
 import type { Tabs } from '@blueprintjs/core'
-import type { ConfigStringPath, ConfigValue } from 'lib/config'
+import type { ConfigStringPath } from 'lib/config'
 import type { UpdateMainTouchbar } from 'lib/touchbar'
 import type { ResizableAreaHandle } from 'react-resizable-area'
 import type { RootState } from 'views/redux/reducer-factory'
@@ -9,7 +9,7 @@ import * as remote from '@electron/remote'
 import * as Sentry from '@sentry/electron/renderer'
 import classNames from 'classnames'
 import { get, sortBy } from 'lodash'
-import React, { Component, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { ResizableArea } from 'react-resizable-area'
@@ -106,46 +106,50 @@ const getResizableAreaProps = ({
 
 const isPluginTab = (key: string): boolean => !['main-view', 'ship-view', 'settings'].includes(key)
 
-interface ControlledTabAreaProps {
-  t: (key: string) => string
-  plugins: Plugin[]
-  doubleTabbed: boolean
-  verticalDoubleTabbed: boolean
-  useGridMenu: boolean
-  activeMainTab: string
-  activePluginName: string
-  mainPanelWidth: SizeOption
-  mainPanelHeight: SizeOption
-  editable: boolean
-  windowmode: ConfigValue<'poi.plugin.windowmode'>
-  favorite: ConfigValue<'poi.plugin.favorite'>
-  pinConfig: ConfigValue<'poi.plugin.pin'>
-  async: boolean
-}
-
 declare global {
   interface Window {
     openSettings?: () => void
   }
 }
 
-const ControlledTabAreaFC = ({
-  t,
-  plugins: rawPlugins,
-  doubleTabbed,
-  verticalDoubleTabbed,
-  useGridMenu,
-  activeMainTab,
-  activePluginName,
-  mainPanelWidth,
-  mainPanelHeight,
-  editable,
-  windowmode,
-  favorite,
-  pinConfig,
-}: ControlledTabAreaProps): React.ReactElement => {
+const ControlledTabAreaFC = (): React.ReactElement => {
+  const { t } = useTranslation(['setting', 'others'])
+
+  const rawPlugins = useSelector((state: RootState) => state.plugins)
+  const windowmode = useSelector((state: RootState) => state.config.poi?.plugin?.windowmode ?? {})
+  const favorite = useSelector((state: RootState) => state.config.poi?.plugin?.favorite ?? {})
+  const pinConfig = useSelector((state: RootState) => state.config.poi?.plugin?.pin ?? {})
+  const activePluginName = useSelector((state: RootState): string => {
+    const fromState = state?.ui?.activePluginName
+    if (fromState != null) return fromState
+    const wm = state.config.poi?.plugin?.windowmode ?? {}
+    const allPlugins = state.plugins
+    const visibleActivePlugins = allPlugins.filter(
+      (plugin) => plugin.enabled && !get(wm, plugin.id, false),
+    )
+    return visibleActivePlugins[0]?.id ?? ''
+  })
+  const doubleTabbed = useSelector(
+    (state: RootState): boolean => state.config.poi?.tabarea?.double ?? false,
+  )
+  const verticalDoubleTabbed = useSelector(
+    (state: RootState): boolean => state.config.poi?.tabarea?.vertical ?? false,
+  )
+  const activeMainTab = useSelector(
+    (state: RootState): string => state.ui?.activeMainTab ?? 'main-view',
+  )
+  const mainPanelWidth = useSelector(
+    (state: RootState): SizeOption =>
+      state.config.poi?.tabarea?.mainpanelwidth ?? { px: 0, percent: 50 },
+  )
+  const mainPanelHeight = useSelector(
+    (state: RootState): SizeOption =>
+      state.config.poi?.tabarea?.mainpanelheight ?? { px: 0, percent: 50 },
+  )
+  const editable = useSelector(
+    (state: RootState): boolean => state.config.poi?.layout?.editable ?? false,
+  )
   const [openedWindow, setOpenedWindow] = useState<Record<string, boolean>>({})
-  const [prevDoubleTabbed, setPrevDoubleTabbed] = useState(doubleTabbed)
 
   const tabsRef = useRef<Tabs | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -164,10 +168,11 @@ const ControlledTabAreaFC = ({
     [dispatch],
   )
 
-  if (doubleTabbed !== prevDoubleTabbed) {
-    dispatchTabChangeEvent({ activeMainTab: 'main-view' })
-    setPrevDoubleTabbed(doubleTabbed)
-  }
+  useLayoutEffect(() => {
+    return () => {
+      dispatchTabChangeEvent({ activeMainTab: 'main-view' })
+    }
+  }, [doubleTabbed, dispatchTabChangeEvent])
 
   const plugins = sortBy(rawPlugins, [(plugin) => (favorite?.[plugin.id] ? 0 : 1), 'priority'])
 
@@ -398,6 +403,22 @@ const ControlledTabAreaFC = ({
     }
   }, [pinConfig, openWindow, plugins, openedWindow])
 
+  // When the active plugin moves to window mode, switch to the nearest available tabbed plugin
+  useEffect(() => {
+    if (!activePluginName) return
+    if (tabbedPlugins.some((p) => p.id === activePluginName)) return
+    if (tabbedPlugins.length === 0) return
+
+    const fallback = tabbedPlugins[0]
+    const tabInfo: { activeMainTab?: string; activePluginName?: string } = {
+      activePluginName: fallback.id,
+    }
+    if (activeMainTab === activePluginName) {
+      tabInfo.activeMainTab = fallback.id
+    }
+    dispatchTabChangeEvent(tabInfo, true)
+  }, [tabbedPlugins, activePluginName, activeMainTab, dispatchTabChangeEvent])
+
   const activePlugin: Partial<Plugin> =
     tabbedPlugins.find((p) => p.packageName === activePluginName) ?? tabbedPlugins[0] ?? {}
 
@@ -417,7 +438,6 @@ const ControlledTabAreaFC = ({
     activePlugin,
     tabbedPlugins,
     listedPlugins,
-    useGridMenu,
     activeMainTab,
     isWindowMode,
     onOpenWindow: openWindow,
@@ -475,8 +495,9 @@ interface ErrorBoundaryState {
   eventId?: string
 }
 
-class TabAreaErrorBoundary extends Component<ControlledTabAreaProps, ErrorBoundaryState> {
+export class ControlledTabArea extends Component<object, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false }
+  private _recoveryCount = 0
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     console.error(error, info)
@@ -486,74 +507,16 @@ class TabAreaErrorBoundary extends Component<ControlledTabAreaProps, ErrorBounda
       const eventId = Sentry.captureException(error)
       this.setState({ hasError: true, error, info, eventId })
     })
+    // Auto-recover from transient errors (e.g. cleanup errors when closing a plugin
+    // window). Rate-limited to prevent infinite crash-recovery loops from genuine bugs.
+    if (this._recoveryCount < 3) {
+      this._recoveryCount++
+      setTimeout(() => this.setState({ hasError: false }), 0)
+    }
   }
 
   render(): React.ReactNode {
     if (this.state.hasError) return <div />
-    return <ControlledTabAreaFC {...this.props} />
+    return <ControlledTabAreaFC />
   }
-}
-
-export const ControlledTabArea = (): React.ReactElement => {
-  const { t } = useTranslation(['setting', 'others'])
-
-  const plugins = useSelector((state: RootState) => state.plugins)
-  const windowmode = useSelector((state: RootState) => state.config.poi?.plugin?.windowmode ?? {})
-  const favorite = useSelector((state: RootState) => state.config.poi?.plugin?.favorite ?? {})
-  const pinConfig = useSelector((state: RootState) => state.config.poi?.plugin?.pin ?? {})
-  const activePluginName = useSelector((state: RootState): string => {
-    const fromState = state?.ui?.activePluginName
-    if (fromState != null) return fromState
-    const wm = state.config.poi?.plugin?.windowmode ?? {}
-    const allPlugins = state.plugins
-    const visibleActivePlugins = allPlugins.filter(
-      (plugin) => plugin.enabled && !get(wm, plugin.id, false),
-    )
-    return visibleActivePlugins[0]?.id ?? ''
-  })
-  const doubleTabbed = useSelector(
-    (state: RootState): boolean => state.config.poi?.tabarea?.double ?? false,
-  )
-  const verticalDoubleTabbed = useSelector(
-    (state: RootState): boolean => state.config.poi?.tabarea?.vertical ?? false,
-  )
-  const useGridMenu = useSelector(
-    (state: RootState): boolean => state.config.poi?.tabarea?.grid ?? true,
-  )
-  const activeMainTab = useSelector(
-    (state: RootState): string => state.ui?.activeMainTab ?? 'main-view',
-  )
-  const mainPanelWidth = useSelector(
-    (state: RootState): SizeOption =>
-      state.config.poi?.tabarea?.mainpanelwidth ?? { px: 0, percent: 50 },
-  )
-  const mainPanelHeight = useSelector(
-    (state: RootState): SizeOption =>
-      state.config.poi?.tabarea?.mainpanelheight ?? { px: 0, percent: 50 },
-  )
-  const editable = useSelector(
-    (state: RootState): boolean => state.config.poi?.layout?.editable ?? false,
-  )
-  const asyncProp = useSelector(
-    (state: RootState): boolean => state.config.poi?.misc?.async ?? true,
-  )
-
-  return (
-    <TabAreaErrorBoundary
-      t={t}
-      plugins={plugins}
-      doubleTabbed={doubleTabbed}
-      verticalDoubleTabbed={verticalDoubleTabbed}
-      useGridMenu={useGridMenu}
-      activeMainTab={activeMainTab}
-      activePluginName={activePluginName}
-      mainPanelWidth={mainPanelWidth}
-      mainPanelHeight={mainPanelHeight}
-      editable={editable}
-      windowmode={windowmode}
-      favorite={favorite}
-      pinConfig={pinConfig}
-      async={asyncProp}
-    />
-  )
 }
