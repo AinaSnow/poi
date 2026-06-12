@@ -3,7 +3,17 @@ import type { Dispatch } from 'redux'
 
 import { createSlice } from '@reduxjs/toolkit'
 import CSON from 'cson'
-import { map, sortBy, mapValues, forEach, values, fromPairs, isEqual, range } from 'lodash'
+import {
+  map,
+  sortBy,
+  mapValues,
+  forEach,
+  values,
+  fromPairs,
+  isEqual,
+  range,
+  includes,
+} from 'lodash'
 import moment from 'moment-timezone'
 import path from 'path'
 import Scheduler from 'views/services/scheduler'
@@ -81,6 +91,9 @@ export interface QuestGoalSubgoal {
   mission?: string[]
   // Equipment filter
   slotitemType2?: number[]
+  slotitemId?: number[]
+  materialShipType?: number[]
+  materialShipMinCount?: number
   // Internal tracking hint (used to disambiguate overlapping quests)
   times?: number[]
 }
@@ -326,12 +339,11 @@ function satisfyGoal(
 ): boolean {
   const goalReq = goal[req]
   const optionVal = options?.[req]
-  // @ts-expect-error FIXME: wating ts magic
-  const unsatisfy = goalReq && (!optionVal || !goalReq.includes(optionVal))
+  const unsatisfy = goalReq && (!optionVal || !includes(goalReq, optionVal))
   return !unsatisfy
 }
 
-function satisfyShip(goal: QuestGoalSubgoal, options: QuestOptions): boolean {
+export function satisfyShip(goal: QuestGoalSubgoal, options: QuestOptions): boolean {
   if (
     goal.flagship &&
     ((options?.shipname?.length ?? 0) < 1 ||
@@ -432,6 +444,13 @@ function updateQuestRecordFactory(
         if (!satisfyGoal('mission', subgoal, options)) return
         if (!satisfyGoal('maparea', subgoal, options)) return
         if (!satisfyGoal('slotitemType2', subgoal, options)) return
+        if (!satisfyGoal('slotitemId', subgoal, options)) return
+        if (subgoal.materialShipType) {
+          const validCount =
+            options?.materialShipTypes?.filter((t) => subgoal.materialShipType!.includes(t))
+              .length ?? 0
+          if (validCount < (subgoal.materialShipMinCount ?? 3)) return
+        }
         if (!satisfyGoal('times', subgoal, options)) return
         if (!satisfyGoal('mapcell', subgoal, options)) return
         const shipOptions = {

@@ -1,6 +1,7 @@
 import type { APISlotItem } from 'kcsapi/api_get_member/require_info/response'
+import type { Indexify } from 'shims/utils'
 
-import { createSlice } from '@reduxjs/toolkit'
+import { createSlice, type UnknownAction } from '@reduxjs/toolkit'
 import { keyBy, filter } from 'lodash'
 import { compareUpdate, indexify, pickExisting } from 'views/utils/tools'
 
@@ -21,9 +22,7 @@ import {
 
 export type Equip = APISlotItem
 
-export interface EquipsState {
-  [key: `${number}` | number]: Equip
-}
+export type EquipsState = Indexify<Equip>
 
 // Returns a clone
 // Don't worry about -1 because it won't cause error
@@ -62,7 +61,11 @@ const equipsSlice = createSlice({
         }
       })
       .addCase(createAPIReqKousyouGetShipResponseAction, (state, { payload }) => {
-        const items = payload.body.api_slotitem
+        const items = payload.body.api_slotitem?.map((item) => ({
+          api_level: 0,
+          api_locked: 0,
+          ...item,
+        }))
         if (!items || items.length === 0) return state
         return {
           ...state,
@@ -124,17 +127,14 @@ const equipsSlice = createSlice({
   },
 })
 
-export function reducer(
-  state: EquipsState = {},
-  action: { type: string; payload?: unknown },
-): EquipsState {
-  switch (action.type) {
-    // These cross-slice dependent cases are handled by equipsCrossSliceMiddleware.
-    // Keep the type here so the old behavior isn't accidentally reintroduced.
-    case createAPIReqKaisouPowerupResponseAction.type:
-    case createAPIReqKousyouDestroyshipResponseAction.type:
-      return state
-    default:
-      return equipsSlice.reducer(state, action)
+export function reducer(state: EquipsState = {}, action: UnknownAction): EquipsState {
+  // These cross-slice dependent cases are handled by equipsCrossSliceMiddleware.
+  // Keep the type here so the old behavior isn't accidentally reintroduced.
+  if (
+    createAPIReqKaisouPowerupResponseAction.match(action) ||
+    createAPIReqKousyouDestroyshipResponseAction.match(action)
+  ) {
+    return state
   }
+  return equipsSlice.reducer(state, action)
 }

@@ -11,6 +11,8 @@ import memoize from 'fast-memoize'
 import { get, map, zip, flatMap, values, fromPairs } from 'lodash'
 import { createSelector, createSelectorCreator, lruMemoize } from 'reselect'
 
+import { canEquipDaihatsu } from './equipability'
+
 //### Local Types ###
 
 type ExtendedMapInfo = MapInfo & { api_required_defeat_count?: number; api_defeat_count?: number }
@@ -108,6 +110,23 @@ function getMapHp(
   const nowCount = map.api_defeat_count ?? maxCount
   const nowHp = maxCount - nowCount
   return [nowHp, maxCount, undefined]
+}
+
+export function getFleetInfo(
+  deckShipId: number[],
+  state: RootState,
+): { shipname: string[]; shiptype: number[]; shipclass: number[] } {
+  const deckShipAPIShipId = deckShipId.map((id) => get(state, `info.ships.${id}.api_ship_id`, -1))
+  const shipname = deckShipAPIShipId
+    .map((id) => get(state, `const.$ships.${id}.api_name`, ''))
+    .filter((name: string) => name.length > 0)
+  const shiptype = deckShipAPIShipId
+    .map((id) => get(state, `const.$ships.${id}.api_stype`, -1))
+    .filter((id: number) => id > 0)
+  const shipclass = deckShipAPIShipId
+    .map((id) => get(state, `const.$ships.${id}.api_ctype`, -1))
+    .filter((id: number) => id > 0)
+  return { shipname, shiptype, shipclass }
 }
 
 //### Selectors ###
@@ -610,3 +629,8 @@ export const shipRemodelInfoSelector = createSelector(constSelector, ({ $ships }
   })
   return { remodelChains, originMstIdOf }
 })
+
+export const canEquipDaihatsuSelector = createSelector(
+  constSelector,
+  (constState) => (shipMstId: number) => canEquipDaihatsu(shipMstId, constState),
+)
